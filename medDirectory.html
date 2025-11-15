@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medicine Inventory Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .header-content h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        /* Dashboard Stats */
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .stat-card {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-icon {
+            font-size: 3em;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .stat-icon.total {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 50%;
+        }
+
+        .stat-icon.low-stock {
+            background: #fff3e0;
+            padding: 10px;
+            border-radius: 50%;
+        }
+
+        .stat-icon.expiring {
+            background: #ffebee;
+            padding: 10px;
+            border-radius: 50%;
+        }
+
+        .stat-icon.expired {
+            background: #fce4ec;
+            padding: 10px;
+            border-radius: 50%;
+        }
+
+        .stat-details h3 {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #0066ff;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 15px;
+            padding: 20px 30px;
+            flex-wrap: wrap;
+            align-items: center;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 102, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .search-bar {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #0066ff;
+            box-shadow: 0 0 5px rgba(0, 102, 255, 0.3);
+        }
+
+        .filter-select {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: #0066ff;
+        }
+
+        /* Medicines Section */
+        .medicines-section {
+            padding: 30px;
+        }
+
+        .medicines-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .medicines-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .medicine-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .medicine-card:hover {
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+            transform: translateY(-5px);
+            border-color: #0066ff;
+        }
+
+        .medicine-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .medicine-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .medicine-id {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .medicine-category {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-top: 10px;
+        }
+
+        .medicine-details {
+            margin: 15px 0;
+            padding: 15px 0;
+            border-top: 1px solid #f0f0f0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 0.95em;
+        }
+
+        .detail-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .detail-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .stock-indicator {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .stock-good {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+
+        .stock-low {
+            background: #ffe0b2;
+            color: #e65100;
+        }
+
+        .stock-critical {
+            background: #ffcccc;
+            color: #c62828;
+        }
+
+        .expiry-status {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .expiry-good {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+
+        .expiry-warning {
+            background: #ffe0b2;
+            color: #e65100;
+        }
+
+        .expiry-expired {
+            background: #ffcccc;
+            color: #c62828;
+        }
+
+        .medicine-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .edit-btn {
+            background: #667eea;
+            color: white;
+        }
+
+        .edit-btn:hover {
+            background: #5568d3;
+        }
+
+        .delete-btn {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background: #ee5a52;
+        }
+
+        .alert-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .alert-low-stock {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .alert-expiring {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .close {
+            color: #999;
+            float: right;
+            font-size: 2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .close:hover {
+            color: #333;
+        }
+
+        .modal-content h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #0066ff;
+            box-shadow: 0 0 5px rgba(0, 102, 255, 0.3);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .form-actions button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .form-actions .btn-primary {
+            background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%);
+            color: white;
+        }
+
+        .form-actions .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 102, 255, 0.4);
+        }
+
+        .form-actions .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .form-actions .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            color: #666;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-content h1 {
+                font-size: 1.8em;
+            }
+
+            .dashboard-stats {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+                padding: 20px;
+            }
+
+            .medicines-list {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-bar {
+                min-width: auto;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 20% auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🏥 Medicine Inventory Management</h1>
+                <p class="subtitle">Monitor stock levels and expiry dates</p>
+            </div>
+        </header>
+
+        <!-- Dashboard Stats -->
+        <section class="dashboard-stats">
+            <div class="stat-card">
+                <div class="stat-icon total">📦</div>
+                <div class="stat-details">
+                    <h3>Total Medicines</h3>
+                    <p class="stat-number" id="totalMedicines">0</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon low-stock">⚠️</div>
+                <div class="stat-details">
+                    <h3>Low Stock</h3>
+                    <p class="stat-number" id="lowStockCount">0</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon expiring">🔴</div>
+                <div class="stat-details">
+                    <h3>Expiring Soon</h3>
+                    <p class="stat-number" id="expiringCount">0</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon expired">❌</div>
+                <div class="stat-details">
+                    <h3>Expired</h3>
+                    <p class="stat-number" id="expiredCount">0</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Controls -->
+        <section class="controls">
+            <button class="btn btn-primary" id="addMedicineBtn">+ Add Medicine</button>
+            <div class="search-bar">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Search medicines by name or ID..."
+                    class="search-input"
+                >
+            </div>
+            <select id="filterSelect" class="filter-select">
+                <option value="all">All Medicines</option>
+                <option value="low-stock">Low Stock</option>
+                <option value="expiring">Expiring Soon</option>
+                <option value="expired">Expired</option>
+            </select>
+        </section>
+
+        <!-- Medicine List -->
+        <section class="medicines-section">
+            <h2>Medicine List</h2>
+            <div class="medicines-list" id="medicinesList">
+                <!-- Medicine items will be loaded here -->
+            </div>
+        </section>
+
+        <!-- Modal for Adding/Editing Medicine -->
+        <div id="medicineModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2 id="modalTitle">Add New Medicine</h2>
+                <form id="medicineForm">
+                    <div class="form-group">
+                        <label for="medicineName">Medicine Name:</label>
+                        <input type="text" id="medicineName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="medicineId">Medicine ID:</label>
+                        <input type="text" id="medicineId" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="medicineCategory">Category:</label>
+                        <input type="text" id="medicineCategory" placeholder="e.g., Antibiotic, Painkiller">
+                    </div>
+                    <div class="form-group">
+                        <label for="medicineStock">Stock Quantity:</label>
+                        <input type="number" id="medicineStock" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="medicineMinStock">Minimum Stock Level:</label>
+                        <input type="number" id="medicineMinStock" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="medicineExpiryDate">Expiry Date:</label>
+                        <input type="date" id="medicineExpiryDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="medicinePrice">Price per Unit:</label>
+                        <input type="number" id="medicinePrice" min="0" step="0.01">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Medicine</button>
+                        <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Medicine class
+        class Medicine {
+            constructor(id, name, category, stock, minStock, expiryDate, price) {
+                this.id = id;
+                this.name = name;
+                this.category = category;
+                this.stock = stock;
+                this.minStock = minStock;
+                this.expiryDate = new Date(expiryDate);
+                this.price = price;
+                this.addedDate = new Date();
+            }
+
+            isLowStock() {
+                return this.stock < this.minStock && this.stock > 0;
+            }
+
+            isCriticalStock() {
+                return this.stock === 0;
+            }
+
+            isExpired() {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                return this.expiryDate < today;
+            }
+
+            isExpiringLoon() {
+                const today = new Date();
+                const thirtyDaysLater = new Date(today);
+                thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+                return this.expiryDate <= thirtyDaysLater && !this.isExpired();
+            }
+
+            getDaysUntilExpiry() {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const timeDiff = this.expiryDate - today;
+                return Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+            }
+        }
+
+        // Medicine Inventory Manager
+        class MedicineInventoryManager {
+            constructor() {
+                this.medicines = this.loadFromStorage();
+                this.currentEditId = null;
+            }
+
+            loadFromStorage() {
+                const stored = localStorage.getItem('medicines');
+                if (stored) {
+                    const medicines = JSON.parse(stored);
+                    return medicines.map(m => 
+                        new Medicine(m.id, m.name, m.category, m.stock, m.minStock, m.expiryDate, m.price)
+                    );
+                }
+                return this.getDefaultMedicines();
+            }
+
+            getDefaultMedicines() {
+                const medicines = [
+                    new Medicine('MED001', 'Aspirin', 'Painkiller', 150, 50, '2025-12-31', 5.99),
+                    new Medicine('MED002', 'Amoxicillin', 'Antibiotic', 30, 100, '2025-06-15', 12.50),
+                    new Medicine('MED003', 'Ibuprofen', 'Painkiller', 200, 100, '2026-03-20', 7.99),
+                    new Medicine('MED004', 'Ciprofloxacin', 'Antibiotic', 45, 80, '2025-05-10', 15.00),
+                    new Medicine('MED005', 'Lisinopril', 'Blood Pressure', 80, 60, '2026-01-15', 20.00),
+                    new Medicine('MED006', 'Metformin', 'Diabetes', 25, 75, '2025-08-30', 8.99),
+                ];
+                this.saveToStorage(medicines);
+                return medicines;
+            }
+
+            saveToStorage(medicines) {
+                localStorage.setItem('medicines', JSON.stringify(medicines));
+            }
+
+            addMedicine(medicine) {
+                this.medicines.push(medicine);
+                this.saveToStorage(this.medicines);
+            }
+
+            updateMedicine(id, updatedData) {
+                const index = this.medicines.findIndex(m => m.id === id);
+                if (index !== -1) {
+                    this.medicines[index] = new Medicine(
+                        id,
+                        updatedData.name,
+                        updatedData.category,
+                        updatedData.stock,
+                        updatedData.minStock,
+                        updatedData.expiryDate,
+                        updatedData.price
+                    );
+                    this.saveToStorage(this.medicines);
+                    return true;
+                }
+                return false;
+            }
+
+            deleteMedicine(id) {
+                const index = this.medicines.findIndex(m => m.id === id);
+                if (index !== -1) {
+                    this.medicines.splice(index, 1);
+                    this.saveToStorage(this.medicines);
+                    return true;
+                }
+                return false;
+            }
+
+            getMedicineById(id) {
+                return this.medicines.find(m => m.id === id);
+            }
+
+            searchMedicines(query) {
+                const lowerQuery = query.toLowerCase();
+                return this.medicines.filter(m =>
+                    m.name.toLowerCase().includes(lowerQuery) ||
+                    m.id.toLowerCase().includes(lowerQuery) ||
+                    m.category.toLowerCase().includes(lowerQuery)
+                );
+            }
+
+            filterMedicines(filter) {
+                switch(filter) {
+                    case 'low-stock':
+                        return this.medicines.filter(m => m.isLowStock() || m.isCriticalStock());
+                    case 'expiring':
+                        return this.medicines.filter(m => m.isExpiringLoon());
+                    case 'expired':
+                        return this.medicines.filter(m => m.isExpired());
+                    default:
+                        return this.medicines;
+                }
+            }
+
+            getStatistics() {
+                return {
+                    total: this.medicines.length,
+                    lowStock: this.medicines.filter(m => m.isLowStock() || m.isCriticalStock()).length,
+                    expiringSoon: this.medicines.filter(m => m.isExpiringLoon()).length,
+                    expired: this.medicines.filter(m => m.isExpired()).length,
+                };
+            }
+        }
+
+        // UI Manager
+        class UIManager {
+            constructor() {
+                this.manager = new MedicineInventoryManager();
+                this.currentFilter = 'all';
+                this.currentSearch = '';
+                this.initializeEventListeners();
+                this.render();
+            }
+
+            initializeEventListeners() {
+                // Modal controls
+                const modal = document.getElementById('medicineModal');
+                const addBtn = document.getElementById('addMedicineBtn');
+                const closeBtn = document.querySelector('.close');
+                const cancelBtn = document.getElementById('cancelBtn');
+                const form = document.getElementById('medicineForm');
+
+                addBtn.addEventListener('click', () => this.openModal());
+                closeBtn.addEventListener('click', () => this.closeModal());
+                cancelBtn.addEventListener('click', () => this.closeModal());
+                form.addEventListener('submit', (e) => this.handleFormSubmit(e));
+
+                // Search and filter
+                document.getElementById('searchInput').addEventListener('input', (e) => {
+                    this.currentSearch = e.target.value;
+                    this.render();
+                });
+
+                document.getElementById('filterSelect').addEventListener('change', (e) => {
+                    this.currentFilter = e.target.value;
+                    this.render();
+                });
+
+                // Close modal when clicking outside
+                window.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        this.closeModal();
+                    }
+                });
+            }
+
+            openModal(medicineId = null) {
+                const modal = document.getElementById('medicineModal');
+                const form = document.getElementById('medicineForm');
+                const modalTitle = document.getElementById('modalTitle');
+
+                form.reset();
+                this.manager.currentEditId = medicineId;
+
+                if (medicineId) {
+                    const medicine = this.manager.getMedicineById(medicineId);
+                    modalTitle.textContent = 'Edit Medicine';
+                    document.getElementById('medicineName').value = medicine.name;
+                    document.getElementById('medicineId').value = medicine.id;
+                    document.getElementById('medicineCategory').value = medicine.category;
+                    document.getElementById('medicineStock').value = medicine.stock;
+                    document.getElementById('medicineMinStock').value = medicine.minStock;
+                    document.getElementById('medicineExpiryDate').value = this.formatDateForInput(medicine.expiryDate);
+                    document.getElementById('medicinePrice').value = medicine.price;
+                    document.getElementById('medicineId').disabled = true;
+                } else {
+                    modalTitle.textContent = 'Add New Medicine';
+                    document.getElementById('medicineId').disabled = false;
+                }
+
+                modal.style.display = 'block';
+            }
+
+            closeModal() {
+                document.getElementById('medicineModal').style.display = 'none';
+                this.manager.currentEditId = null;
+            }
+
+            handleFormSubmit(e) {
+                e.preventDefault();
+
+                const medicineData = {
+                    name: document.getElementById('medicineName').value,
+                    category: document.getElementById('medicineCategory').value,
+                    stock: parseInt(document.getElementById('medicineStock').value),
+                    minStock: parseInt(document.getElementById('medicineMinStock').value),
+                    expiryDate: document.getElementById('medicineExpiryDate').value,
+                    price: parseFloat(document.getElementById('medicinePrice').value),
+                };
+
+                if (this.manager.currentEditId) {
+                    // Update existing medicine
+                    this.manager.updateMedicine(this.manager.currentEditId, medicineData);
+                } else {
+                    // Add new medicine
+                    const medicineId = document.getElementById('medicineId').value;
+                    const medicine = new Medicine(
+                        medicineId,
+                        medicineData.name,
+                        medicineData.category,
+                        medicineData.stock,
+                        medicineData.minStock,
+                        medicineData.expiryDate,
+                        medicineData.price
+                    );
+                    this.manager.addMedicine(medicine);
+                }
+
+                this.closeModal();
+                this.render();
+            }
+
+            getMedicinesToDisplay() {
+                let medicines = this.manager.medicines;
+
+                // Apply filter
+                medicines = this.manager.filterMedicines(this.currentFilter);
+
+                // Apply search
+                if (this.currentSearch) {
+                    medicines = medicines.filter(m =>
+                        m.name.toLowerCase().includes(this.currentSearch.toLowerCase()) ||
+                        m.id.toLowerCase().includes(this.currentSearch.toLowerCase()) ||
+                        m.category.toLowerCase().includes(this.currentSearch.toLowerCase())
+                    );
+                }
+
+                return medicines;
+            }
+
+            updateStats() {
+                const stats = this.manager.getStatistics();
+                document.getElementById('totalMedicines').textContent = stats.total;
+                document.getElementById('lowStockCount').textContent = stats.lowStock;
+                document.getElementById('expiringCount').textContent = stats.expiringSoon;
+                document.getElementById('expiredCount').textContent = stats.expired;
+            }
+
+            getStockStatus(medicine) {
+                if (medicine.isCriticalStock()) {
+                    return { class: 'stock-critical', text: '❌ Out of Stock' };
+                } else if (medicine.isLowStock()) {
+                    return { class: 'stock-low', text: `⚠️ Low Stock (${medicine.stock} units)` };
+                } else {
+                    return { class: 'stock-good', text: `✅ In Stock (${medicine.stock} units)` };
+                }
+            }
+
+            getExpiryStatus(medicine) {
+                if (medicine.isExpired()) {
+                    return { class: 'expiry-expired', text: '❌ EXPIRED' };
+                } else if (medicine.isExpiringLoon()) {
+                    const days = medicine.getDaysUntilExpiry();
+                    return { class: 'expiry-warning', text: `⚠️ Expiring in ${days} days` };
+                } else {
+                    return { class: 'expiry-good', text: `✅ ${this.formatDate(medicine.expiryDate)}` };
+                }
+            }
+
+            renderMedicines() {
+                const medicinesList = document.getElementById('medicinesList');
+                const medicines = this.getMedicinesToDisplay();
+
+                if (medicines.length === 0) {
+                    medicinesList.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📦</div>
+                            <h3>No medicines found</h3>
+                            <p>Try adjusting your search or filter criteria</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                medicinesList.innerHTML = medicines.map(medicine => {
+                    const stockStatus = this.getStockStatus(medicine);
+                    const expiryStatus = this.getExpiryStatus(medicine);
+
+                    return `
+                        <div class="medicine-card">
+                            <div class="medicine-header">
+                                <div>
+                                    <div class="medicine-name">${medicine.name}</div>
+                                    <div class="medicine-id">ID: ${medicine.id}</div>
+                                </div>
+                            </div>
+                            <span class="medicine-category">${medicine.category}</span>
+                            
+                            <div class="medicine-details">
+                                <div class="detail-row">
+                                    <span class="detail-label">Stock:</span>
+                                    <span class="detail-value">${medicine.stock} units</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Min Stock:</span>
+                                    <span class="detail-value">${medicine.minStock} units</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Price:</span>
+                                    <span class="detail-value">$${medicine.price.toFixed(2)}</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Inventory Value:</span>
+                                    <span class="detail-value">$${(medicine.stock * medicine.price).toFixed(2)}</span>
+                                </div>
+                            </div>
+
+                            <div class="stock-indicator ${stockStatus.class}">
+                                ${stockStatus.text}
+                            </div>
+
+                            <div class="expiry-status ${expiryStatus.class}">
+                                Expires: ${expiryStatus.text}
+                            </div>
+
+                            <div class="medicine-actions">
+                                <button class="action-btn edit-btn" onclick="uiManager.openModal('${medicine.id}')">✏️ Edit</button>
+                                <button class="action-btn delete-btn" onclick="uiManager.deleteMedicine('${medicine.id}')">🗑️ Delete</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            deleteMedicine(id) {
+                if (confirm('Are you sure you want to delete this medicine?')) {
+                    this.manager.deleteMedicine(id);
+                    this.render();
+                }
+            }
+
+            formatDate(date) {
+                return date.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            }
+
+            formatDateForInput(date) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+
+            render() {
+                this.updateStats();
+                this.renderMedicines();
+            }
+        }
+
+        // Initialize the app when DOM is ready
+        let uiManager;
+        document.addEventListener('DOMContentLoaded', () => {
+            uiManager = new UIManager();
+        });
+    </script>
+</body>
+</html>
