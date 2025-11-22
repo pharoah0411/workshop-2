@@ -6,24 +6,19 @@ error_reporting(E_ALL);
 
 // Central DB connection file for the workshop app.
 // !!! YOU MUST CONFIGURE THESE 3 VARIABLES FOR YOUR SQL SERVER !!!
-// Example $serverName: 'localhost\SQLEXPRESS' or '127.0.0.1' or just 'PHAROAHS'
-$serverName = "PHAROAHS"; // <-- REPLACE WITH YOUR ACTUAL SQL SERVER NAME/INSTANCE
+$serverName = "PHAROAHS"; // REPLACE WITH YOUR ACTUAL SQL SERVER NAME/INSTANCE
 $database = "Workshop";
-$uid = ""; // <-- REPLACE WITH YOUR SQL LOGIN USERNAME (or leave empty for Windows Auth)
-$pass = ""; // <-- REPLACE WITH YOUR SQL LOGIN PASSWORD (or leave empty for Windows Auth)
+$uid = ""; // REPLACE WITH YOUR SQL LOGIN USERNAME (or leave empty for Windows Auth)
+$pass = ""; // REPLACE WITH YOUR SQL LOGIN PASSWORD (or leave empty for Windows Auth)
 
 // Variables for connection objects
-$dbType = null; // 'sqlsrv' | 'pdo_sqlsrv' | 'pdo_odbc'
-$conn = null; // for sqlsrv
-$pdo = null;  // for PDO
+$dbType = null;
+$conn = null; 
+$pdo = null;  
 
 // --- DIAGNOSTIC MODE: If this file is accessed directly, it performs a test ---
 if (php_sapi_name() !== 'cli' && realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
-    $info = [];
-    $info['php_version'] = phpversion();
-    $info['server'] = $serverName;
-    $info['database'] = $database;
-    $results = [];
+    $info = []; $info['php_version'] = phpversion(); $info['server'] = $serverName; $info['database'] = $database; $results = [];
 
     // Test sqlsrv extension
     if (function_exists('sqlsrv_connect')) {

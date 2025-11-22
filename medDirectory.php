@@ -10,10 +10,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if ($id_to_delete > 0) {
         try {
             if (isset($pdo) && $pdo instanceof PDO) {
-                $stmt = $pdo->prepare('DELETE FROM Medicine WHERE Id = :id');
+                // FIX: Use 'id' (lowercase)
+                $stmt = $pdo->prepare('DELETE FROM Medicine WHERE id = :id');
                 $stmt->execute([':id' => $id_to_delete]);
             } elseif (isset($conn)) {
-                $sql = 'DELETE FROM Medicine WHERE Id = ?';
+                // FIX: Use 'id' (lowercase)
+                $sql = 'DELETE FROM Medicine WHERE id = ?';
                 sqlsrv_query($conn, $sql, [$id_to_delete]);
             }
         } catch (Exception $e) {
@@ -33,14 +35,17 @@ $filter_type = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 $all_meds = [];
 $connection_error_message = ''; // Variable for error reporting
 
-// Inject default minStock value as the DB table likely doesn't have this column
+// Inject default minStock value (50) as the DB table likely doesn't have this column
 $min_stock_defaults = [ 
     'default' => 50 
 ];
 
 try {
+    // CRITICAL FIX: Changed column name from 'ID' to 'id'
+    $sql = "SELECT id, Name, Category_Type, Quantity_In_Stock, Expiry_Date, Supplier_Name, Unit_Price, Stock_Price FROM Medicine";
+    
     if (isset($pdo) && $pdo !== null) {
-        $sql = "SELECT Id, Name, Category_Type, Quantity_In_Stock, Expiry_Date, Supplier_Name, Unit_Price, Stock_Price FROM Medicine";
+        // PDO fetch logic
         $stmt = $pdo->query($sql);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as $r) {
@@ -49,19 +54,27 @@ try {
                 if ($d instanceof DateTime) $r['Expiry_Date'] = $d->format('Y-m-d');
                 else $r['Expiry_Date'] = date('Y-m-d', strtotime($r['Expiry_Date']));
             }
-            $id_key = $r['Id'] ?? null;
+            $id_key = $r['id'] ?? null; // FIX: Use 'id'
             $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
             $all_meds[] = $r;
         }
     } elseif (isset($conn) && $conn !== null) {
-        $sql = "SELECT Id, Name, Category_Type, Quantity_In_Stock, Expiry_Date, Supplier_Name, Unit_Price, Stock_Price FROM Medicine";
-        $stmt = @sqlsrv_query($conn, $sql);
-        if ($stmt !== false) {
+        // SQLSRV fetch logic with explicit error checking
+        $stmt = sqlsrv_query($conn, $sql);
+        if ($stmt === false) {
+            $sqlsrv_errors = sqlsrv_errors(SQLSRV_ERR_ERRORS);
+            $error_msg = 'SQL Query Failed.';
+            if ($sqlsrv_errors) {
+                // Display the specific SQL Server error
+                $error_msg .= ' Details: ' . print_r($sqlsrv_errors, true);
+            }
+            $connection_error_message = '❌ DATABASE QUERY FAILED: ' . $error_msg;
+        } else {
             while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
                 if (!empty($r['Expiry_Date']) && $r['Expiry_Date'] instanceof DateTime) {
                     $r['Expiry_Date'] = $r['Expiry_Date']->format('Y-m-d');
                 }
-                $id_key = $r['Id'] ?? null;
+                $id_key = $r['id'] ?? null; // FIX: Use 'id'
                 $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
                 $all_meds[] = $r;
             }
@@ -72,7 +85,7 @@ try {
     }
 } catch (Exception $e) {
     $all_meds = [];
-    $connection_error_message = '❌ DATABASE QUERY FAILED: ' . htmlspecialchars($e->getMessage());
+    $connection_error_message = '❌ PHP EXCEPTION: ' . htmlspecialchars($e->getMessage());
 }
 
 // --- 3. Calculate Stats from all_meds (for dashboard) ---
@@ -87,7 +100,7 @@ foreach ($all_meds as $m) {
     $stock = (int)($m['Quantity_In_Stock'] ?? 0);
     $minStock = (int)($m['minStock'] ?? 0);
     $expiry = !empty($m['Expiry_Date']) ? strtotime($m['Expiry_Date']) : null;
-
+    
     if ($stock <= $minStock) {
         $lowStockCount++;
     }
@@ -107,7 +120,7 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
     if ($search_query !== '') {
         $q = strtolower($search_query);
         $name = strtolower($m['Name'] ?? '');
-        $id = strtolower($m['Id'] ?? '');
+        $id = strtolower($m['id'] ?? ''); // FIX: Use 'id'
         $category = strtolower($m['Category_Type'] ?? '');
         if (strpos($name, $q) === false && strpos($id, $q) === false && strpos($category, $q) === false) {
             return false;
@@ -274,7 +287,7 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
             <div class="medicines-list" id="medicinesList">
                 <?php if (!empty($meds_to_display)): ?>
                     <?php foreach ($meds_to_display as $m):
-                        $id = htmlspecialchars($m['Id'] ?? $m['id']);
+                        $id = htmlspecialchars($m['id'] ?? $m['id']); // FIX: Use 'id'
                         $name = htmlspecialchars($m['Name'] ?? $m['name'] ?? '');
                         $category = htmlspecialchars($m['Category_Type'] ?? $m['category'] ?? '');
                         $stock = (int)($m['Quantity_In_Stock'] ?? 0);
