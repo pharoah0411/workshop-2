@@ -10,12 +10,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if ($id_to_delete > 0) {
         try {
             if (isset($pdo) && $pdo instanceof PDO) {
-                // FIX: Use 'id' (lowercase)
-                $stmt = $pdo->prepare('DELETE FROM Medicine WHERE id = :id');
+                // FIX: Use MEDICINE_ID
+                $stmt = $pdo->prepare('DELETE FROM Medicine WHERE MEDICINE_ID = :id');
                 $stmt->execute([':id' => $id_to_delete]);
             } elseif (isset($conn)) {
-                // FIX: Use 'id' (lowercase)
-                $sql = 'DELETE FROM Medicine WHERE id = ?';
+                // FIX: Use MEDICINE_ID
+                $sql = 'DELETE FROM Medicine WHERE MEDICINE_ID = ?';
                 sqlsrv_query($conn, $sql, [$id_to_delete]);
             }
         } catch (Exception $e) {
@@ -41,8 +41,8 @@ $min_stock_defaults = [
 ];
 
 try {
-    // CRITICAL FIX: Changed column name from 'ID' to 'id'
-    $sql = "SELECT id, Name, Category_Type, Quantity_In_Stock, Expiry_Date, Supplier_Name, Unit_Price, Stock_Price FROM Medicine";
+    // CRITICAL FIX: Use MEDICINE_ID in the SELECT statement
+    $sql = "SELECT MEDICINE_ID, Name, Category_Type, Quantity_In_Stock, Expiry_Date, Supplier_Name, Unit_Price, Stock_Price FROM Medicine";
     
     if (isset($pdo) && $pdo !== null) {
         // PDO fetch logic
@@ -54,7 +54,7 @@ try {
                 if ($d instanceof DateTime) $r['Expiry_Date'] = $d->format('Y-m-d');
                 else $r['Expiry_Date'] = date('Y-m-d', strtotime($r['Expiry_Date']));
             }
-            $id_key = $r['id'] ?? null; // FIX: Use 'id'
+            $id_key = $r['MEDICINE_ID'] ?? null; // FIX: Use MEDICINE_ID
             $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
             $all_meds[] = $r;
         }
@@ -74,7 +74,7 @@ try {
                 if (!empty($r['Expiry_Date']) && $r['Expiry_Date'] instanceof DateTime) {
                     $r['Expiry_Date'] = $r['Expiry_Date']->format('Y-m-d');
                 }
-                $id_key = $r['id'] ?? null; // FIX: Use 'id'
+                $id_key = $r['MEDICINE_ID'] ?? null; // FIX: Use MEDICINE_ID
                 $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
                 $all_meds[] = $r;
             }
@@ -97,9 +97,9 @@ $expiringCount = 0;
 $expiredCount = 0;
 
 foreach ($all_meds as $m) {
-    $stock = (int)($m['Quantity_In_Stock'] ?? 0);
+    $stock = (int)($m['QUANTITY_IN_STOCK'] ?? 0);
     $minStock = (int)($m['minStock'] ?? 0);
-    $expiry = !empty($m['Expiry_Date']) ? strtotime($m['Expiry_Date']) : null;
+    $expiry = !empty($m['EXPIRY_DATE']) ? strtotime($m['EXPIRY_DATE']) : null;
     
     if ($stock <= $minStock) {
         $lowStockCount++;
@@ -120,17 +120,17 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
     if ($search_query !== '') {
         $q = strtolower($search_query);
         $name = strtolower($m['Name'] ?? '');
-        $id = strtolower($m['id'] ?? ''); // FIX: Use 'id'
-        $category = strtolower($m['Category_Type'] ?? '');
+        $id = strtolower($m['MEDICINE_ID'] ?? ''); // FIX: Use MEDICINE_ID
+        $category = strtolower($m['CATEGORY_TYPE'] ?? '');
         if (strpos($name, $q) === false && strpos($id, $q) === false && strpos($category, $q) === false) {
             return false;
         }
     }
 
     // Category filter
-    $stock = (int)($m['Quantity_In_Stock'] ?? 0);
+    $stock = (int)($m['QUANTITY_IN_STOCK'] ?? 0);
     $minStock = (int)($m['minStock'] ?? 0);
-    $expiry = !empty($m['Expiry_Date']) ? strtotime($m['Expiry_Date']) : null;
+    $expiry = !empty($m['EXPIRY_DATE']) ? strtotime($m['EXPIRY_DATE']) : null;
 
     switch ($filter_type) {
         case 'low-stock':
@@ -287,14 +287,14 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
             <div class="medicines-list" id="medicinesList">
                 <?php if (!empty($meds_to_display)): ?>
                     <?php foreach ($meds_to_display as $m):
-                        $id = htmlspecialchars($m['id'] ?? $m['id']); // FIX: Use 'id'
-                        $name = htmlspecialchars($m['Name'] ?? $m['name'] ?? '');
-                        $category = htmlspecialchars($m['Category_Type'] ?? $m['category'] ?? '');
-                        $stock = (int)($m['Quantity_In_Stock'] ?? 0);
+                        $id = htmlspecialchars($m['MEDICINE_ID'] ?? ''); // FIX: Use MEDICINE_ID
+                        $name = htmlspecialchars($m['NAME'] ?? '');
+                        $category = htmlspecialchars($m['CATEGORY_TYPE'] ?? '');
+                        $stock = (int)($m['QUANTITY_IN_STOCK'] ?? 0);
                         $minStock = (int)($m['minStock'] ?? 0);
-                        $unitPrice = (float)($m['Unit_Price'] ?? $m['unitPrice'] ?? $m['price'] ?? 0);
+                        $unitPrice = (float)($m['UNIT_PRICE'] ?? 0);
                         $price = number_format($unitPrice, 2);
-                        $expiry = !empty($m['Expiry_Date']) ? $m['Expiry_Date'] : null;
+                        $expiry = !empty($m['EXPIRY_DATE']) ? $m['EXPIRY_DATE'] : null;
 
                         // stock status
                         $stockClass = 'stock-good'; $stockText = "✅ In Stock ({$stock} units)";
