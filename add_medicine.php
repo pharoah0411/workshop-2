@@ -1,4 +1,54 @@
-<?php require_once 'connection.php'; ?>
+<?php
+require_once 'connection.php';
+
+// --- Handle POST Request for Adding Medicine ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Collect and validate input using ALL-CAPS column names
+    $name = isset($_POST['name']) ? trim($_POST['name']) : '';
+    $category = isset($_POST['category']) ? trim($_POST['category']) : null;
+    $stock = isset($_POST['stock']) ? intval($_POST['stock']) : 0;
+    $minStock = isset($_POST['minStock']) ? intval($_POST['minStock']) : 0; // Note: minStock is not a DB column but collected for future use/consistency
+    $expiry = isset($_POST['expiryDate']) && $_POST['expiryDate'] !== '' ? $_POST['expiryDate'] : null;
+    $price = isset($_POST['price']) ? floatval($_POST['price']) : null;
+    $supplier = isset($_POST['supplier']) ? trim($_POST['supplier']) : null; // Assuming a supplier field might exist/be needed
+
+    if ($name === '') {
+        // Simple client-side validation is better, but this handles required fields server-side
+        $error = "Medicine Name is required.";
+    } else {
+        try {
+            if (isset($pdo) && $pdo instanceof PDO) {
+                $stmt = $pdo->prepare("INSERT INTO MEDICINE (NAME, CATEGORY_TYPE, QUANTITY_IN_STOCK, EXPIRY_DATE, UNIT_PRICE, SUPPLIER_NAME) VALUES (:name, :category, :stock, :expiry, :unitPrice, :supplier)");
+                $stmt->execute([
+                    ':name' => $name,
+                    ':category' => $category,
+                    ':stock' => $stock,
+                    ':expiry' => $expiry,
+                    ':unitPrice' => $price,
+                    ':supplier' => $supplier
+                ]);
+            } elseif (isset($conn)) {
+                $sql = "INSERT INTO MEDICINE (NAME, CATEGORY_TYPE, QUANTITY_IN_STOCK, EXPIRY_DATE, UNIT_PRICE, SUPPLIER_NAME) VALUES (?, ?, ?, ?, ?, ?)";
+                $params = [$name, $category, $stock, $expiry, $price, $supplier];
+                $res = sqlsrv_query($conn, $sql, $params);
+                if ($res === false) {
+                    throw new Exception('Insert failed: ' . print_r(sqlsrv_errors(), true));
+                }
+            } else {
+                $error = 'No database connection available.';
+            }
+        } catch (Exception $e) {
+            $error = 'Failed to add medicine: ' . htmlspecialchars($e->getMessage());
+        }
+
+        if (!isset($error)) {
+            // Redirect back to the directory on success
+            header('Location: medDirectory.php');
+            exit;
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,8 +71,8 @@
     .btn-primary { background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%); color:#fff; }
     .btn-secondary { background:#e0e0e0; }
     a.back { display:inline-block; margin-top:12px; color:#0066ff; }
+    .error-message { color: red; margin-bottom: 15px; font-weight: bold; }
   </style>
-  <script src="med_manager.js"></script>
 </head>
 <body>
   <div class="container">
@@ -33,57 +83,48 @@
     </header>
 
     <div class="content">
-      <form id="form">
+      <?php if (isset($error)): ?>
+        <p class="error-message">Error: <?php echo $error; ?></p>
+      <?php endif; ?>
+
+      <form id="form" method="POST" action="add_medicine.php">
         <div class="form-group">
           <label for="name">Medicine Name</label>
-          <input id="name" required>
+          <input id="name" name="name" required value="<?php echo htmlspecialchars($name ?? ''); ?>">
         </div>
         <div class="form-group">
-          <label for="category">Category</label>
-          <input id="category">
+          <label for="category">Category (Type)</label>
+          <input id="category" name="category" value="<?php echo htmlspecialchars($category ?? ''); ?>">
         </div>
         <div class="form-group">
           <label for="stock">Stock Quantity</label>
-          <input id="stock" type="number" min="0" value="0">
+          <input id="stock" name="stock" type="number" min="0" value="<?php echo htmlspecialchars($stock ?? 0); ?>">
         </div>
         <div class="form-group">
           <label for="minStock">Minimum Stock Level</label>
-          <input id="minStock" type="number" min="0" value="0">
+          <input id="minStock" name="minStock" type="number" min="0" value="<?php echo htmlspecialchars($minStock ?? 0); ?>">
         </div>
         <div class="form-group">
           <label for="expiryDate">Expiry Date</label>
-          <input id="expiryDate" type="date">
+          <input id="expiryDate" name="expiryDate" type="date" value="<?php echo htmlspecialchars($expiry ?? ''); ?>">
         </div>
         <div class="form-group">
           <label for="price">Price per Unit</label>
-          <input id="price" type="number" step="0.01" value="0.00">
+          <input id="price" name="price" type="number" step="0.01" value="<?php echo htmlspecialchars($price ?? 0.00); ?>">
+        </div>
+        <div class="form-group">
+          <label for="supplier">Supplier Name</label>
+          <input id="supplier" name="supplier" value="<?php echo htmlspecialchars($supplier ?? ''); ?>">
         </div>
 
         <div class="form-actions">
           <button class="btn btn-primary" type="submit">Add Medicine</button>
-          <button class="btn btn-secondary" type="button" id="cancel">Cancel</button>
+          <a class="btn btn-secondary" href="medDirectory.php">Cancel</a>
         </div>
       </form>
 
       <a class="back" href="medDirectory.php">← Back to Directory</a>
     </div>
   </div>
-
-  <script>
-    document.getElementById('form').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const m = {
-        name: document.getElementById('name').value.trim(),
-        category: document.getElementById('category').value.trim(),
-        stock: Number(document.getElementById('stock').value),
-        minStock: Number(document.getElementById('minStock').value),
-        expiryDate: document.getElementById('expiryDate').value || null,
-        price: Number(document.getElementById('price').value) || 0
-      };
-      await MedManager.add(m);
-      location.href = 'medDirectory.php';
-    });
-    document.getElementById('cancel').addEventListener('click', ()=>location.href='medDirectory.php');
-  </script>
 </body>
 </html>
