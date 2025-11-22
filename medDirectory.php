@@ -41,20 +41,20 @@ $min_stock_defaults = [
 ];
 
 try {
-    // CRITICAL FIX: Use MEDICINE_ID in the SELECT statement
-    $sql = "SELECT MEDICINE_ID, Name, Category_Type, Quantity_In_Stock, Expiry_Date, Supplier_Name, Unit_Price, Stock_Price FROM Medicine";
+    // FIX: Use MEDICINE_ID in the SELECT statement
+    $sql = "SELECT MEDICINE_ID, NAME, CATEGORY_TYPE, QUANTITY_IN_STOCK, EXPIRY_DATE, SUPPLIER_NAME, UNIT_PRICE, STOCK_PRICE FROM Medicine";
     
     if (isset($pdo) && $pdo !== null) {
         // PDO fetch logic
         $stmt = $pdo->query($sql);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as $r) {
-            if (!empty($r['Expiry_Date'])) {
-                $d = $r['Expiry_Date'];
-                if ($d instanceof DateTime) $r['Expiry_Date'] = $d->format('Y-m-d');
-                else $r['Expiry_Date'] = date('Y-m-d', strtotime($r['Expiry_Date']));
+            if (!empty($r['EXPIRY_DATE'])) {
+                $d = $r['EXPIRY_DATE'];
+                if ($d instanceof DateTime) $r['EXPIRY_DATE'] = $d->format('Y-m-d');
+                else $r['EXPIRY_DATE'] = date('Y-m-d', strtotime($r['EXPIRY_DATE']));
             }
-            $id_key = $r['MEDICINE_ID'] ?? null; // FIX: Use MEDICINE_ID
+            $id_key = $r['MEDICINE_ID'] ?? null;
             $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
             $all_meds[] = $r;
         }
@@ -71,10 +71,10 @@ try {
             $connection_error_message = '❌ DATABASE QUERY FAILED: ' . $error_msg;
         } else {
             while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-                if (!empty($r['Expiry_Date']) && $r['Expiry_Date'] instanceof DateTime) {
-                    $r['Expiry_Date'] = $r['Expiry_Date']->format('Y-m-d');
+                if (!empty($r['EXPIRY_DATE']) && $r['EXPIRY_DATE'] instanceof DateTime) {
+                    $r['EXPIRY_DATE'] = $r['EXPIRY_DATE']->format('Y-m-d');
                 }
-                $id_key = $r['MEDICINE_ID'] ?? null; // FIX: Use MEDICINE_ID
+                $id_key = $r['MEDICINE_ID'] ?? null;
                 $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
                 $all_meds[] = $r;
             }
@@ -119,8 +119,9 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
     // Search filter
     if ($search_query !== '') {
         $q = strtolower($search_query);
-        $name = strtolower($m['Name'] ?? '');
-        $id = strtolower($m['MEDICINE_ID'] ?? ''); // FIX: Use MEDICINE_ID
+        // FIX: Use all-caps column names for search
+        $name = strtolower($m['NAME'] ?? '');
+        $id = strtolower($m['MEDICINE_ID'] ?? '');
         $category = strtolower($m['CATEGORY_TYPE'] ?? '');
         if (strpos($name, $q) === false && strpos($id, $q) === false && strpos($category, $q) === false) {
             return false;
@@ -287,7 +288,8 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
             <div class="medicines-list" id="medicinesList">
                 <?php if (!empty($meds_to_display)): ?>
                     <?php foreach ($meds_to_display as $m):
-                        $id = htmlspecialchars($m['MEDICINE_ID'] ?? ''); // FIX: Use MEDICINE_ID
+                        // FIXES APPLIED HERE: Using all-caps column names for display
+                        $id = htmlspecialchars($m['MEDICINE_ID'] ?? '');
                         $name = htmlspecialchars($m['NAME'] ?? '');
                         $category = htmlspecialchars($m['CATEGORY_TYPE'] ?? '');
                         $stock = (int)($m['QUANTITY_IN_STOCK'] ?? 0);
