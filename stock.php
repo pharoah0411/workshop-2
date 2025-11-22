@@ -1,4 +1,46 @@
-<?php require_once 'connection.php'; ?>
+<?php 
+require_once 'connection.php'; 
+
+$low_stock_meds = [];
+$MIN_STOCK_THRESHOLD = 50; // Hardcoded minimum stock for check
+$error = '';
+
+try {
+    // FIX: Use MEDICINE_ID and all-caps column names
+    $sql = "SELECT MEDICINE_ID, NAME, CATEGORY_TYPE, QUANTITY_IN_STOCK FROM MEDICINE";
+    $rows = [];
+
+    if (isset($pdo) && $pdo !== null) {
+        $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    } elseif (isset($conn) && $conn !== null) {
+        $stmt = sqlsrv_query($conn, $sql);
+        if ($stmt !== false) {
+            while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+                $rows[] = $r;
+            }
+            sqlsrv_free_stmt($stmt);
+        }
+    } else {
+        $error = 'No database connection available.';
+    }
+
+    // Filter results in PHP for low stock
+    foreach ($rows as $m) {
+        $stock = (int)($m['QUANTITY_IN_STOCK'] ?? 0);
+        
+        // Check if stock is low (using hardcoded threshold)
+        if ($stock <= $MIN_STOCK_THRESHOLD) {
+            // Inject the threshold for display purposes
+            $m['minStock'] = $MIN_STOCK_THRESHOLD; 
+            $low_stock_meds[] = $m;
+        }
+    }
+
+} catch (Exception $e) {
+    $error = 'Failed to load stock data: ' . htmlspecialchars($e->getMessage());
+}
+
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,47 +61,41 @@
         a.back{display:inline-block;margin-top:12px;color:#0066ff}
         .low{background:#fff3e0;padding:8px;border-radius:6px;color:#e65100;margin-top:8px;font-weight:700}
         .critical{background:#ffcccc;padding:8px;border-radius:6px;color:#c62828;margin-top:8px;font-weight:700}
+        .error-message { color: red; margin-bottom: 15px; font-weight: bold; }
     </style>
-    <script>
-        /* Inlined MedManager (from med_manager.js) */
-        (function(global){
-            const STORAGE_KEY = 'medicines';
-            function load(){const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return []; try{return JSON.parse(raw)}catch(e){return[]}}
-            function save(list){localStorage.setItem(STORAGE_KEY, JSON.stringify(list))}
-            function generateId(){return 'MED'+Date.now().toString().slice(-6)}
-            function getById(id){const all=load(); return all.find(m=>m.id===id)||null}
-            function add(m){const all=load(); if(!m.id) m.id=generateId(); all.push(m); save(all); return m}
-            function update(id, updated){const all=load(); const idx=all.findIndex(x=>x.id===id); if(idx===-1) return false; all[idx]=Object.assign({}, all[idx], updated, {id}); save(all); return true}
-            function remove(id){let all=load(); const before=all.length; all=all.filter(x=>x.id!==id); save(all); return all.length<before}
-            function filterExpiring(days=30){const all=load(); const now=new Date(); const limit=new Date(now); limit.setDate(limit.getDate()+Number(days)); return all.filter(m=>{ if(!m.expiryDate) return false; const d=new Date(m.expiryDate); return d<=limit && d>=now })}
-            function filterExpired(){const all=load(); const now=new Date(); return all.filter(m=>m.expiryDate && new Date(m.expiryDate)<now)}
-            function filterLowStock(){const all=load(); return all.filter(m=>Number(m.stock)<=Number(m.minStock))}
-            function ensureSampleData(){const all=load(); if(all.length) return; const sample=[{id:'MED001',name:'Aspirin',category:'Painkiller',stock:150,minStock:50,expiryDate:'2025-12-31',price:5.99},{id:'MED002',name:'Amoxicillin',category:'Antibiotic',stock:30,minStock:100,expiryDate:'2025-06-15',price:12.50},{id:'MED003',name:'Ibuprofen',category:'Painkiller',stock:200,minStock:100,expiryDate:'2026-03-20',price:7.99}]; save(sample)}
-            global.MedManager={load,save,add,update,remove,getById,filterExpiring,filterExpired,filterLowStock,ensureSampleData}
-        })(window);
-    </script>
 </head>
 <body>
     <div class="container">
         <header class="header"><h1>⚠️ Low Stock / Out of Stock</h1></header>
         <div class="content">
-            <div id="list" class="medicines-list"></div>
+            <?php if (!empty($error)): ?>
+                <p class="error-message">Error: <?php echo $error; ?></p>
+            <?php endif; ?>
+            <div id="list" class="medicines-list">
+                <?php if (empty($low_stock_meds)): ?>
+                    <p class="small">No low-stock medicines found (Threshold: <?php echo $MIN_STOCK_THRESHOLD; ?> units).</p>
+                <?php else: ?>
+                    <?php foreach ($low_stock_meds as $m): 
+                        $id = htmlspecialchars($m['MEDICINE_ID']);
+                        $name = htmlspecialchars($m['NAME']);
+                        $category = htmlspecialchars($m['CATEGORY_TYPE'] ?? '');
+                        $stock = (int)($m['QUANTITY_IN_STOCK'] ?? 0);
+                        $minStock = (int)($m['minStock'] ?? $MIN_STOCK_THRESHOLD);
+                        $statusClass = ($stock <= 0) ? 'critical' : 'low';
+                        $statusText = ($stock <= 0) ? 'Out of stock' : "Low stock: {$stock} units";
+                    ?>
+                        <div class="medicine-card">
+                            <div class="medicine-name"><?php echo $name; ?></div>
+                            <div class="small">ID: <?php echo $id; ?> • <?php echo $category; ?></div>
+                            <div style="margin-top:8px">Min Stock: <?php echo $minStock; ?></div>
+                            <div class="<?php echo $statusClass; ?>"><?php echo $statusText; ?></div>
+                            <div style="margin-top:10px"><a href="edit_medicine.php?id=<?php echo urlencode($id); ?>">Edit</a></div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
             <a class="back" href="medDirectory.php">← Back to Directory</a>
         </div>
     </div>
-
-    <script>
-        function render(list){
-            const c = document.getElementById('list');
-            if (!list.length) { c.innerHTML = '<p class="small">No low-stock medicines.</p>'; return; }
-            c.innerHTML = list.map(m=>{
-                const status = (Number(m.stock) <= 0) ? `<div class="critical">Out of stock</div>` : `<div class="low">Low stock: ${m.stock} units</div>`;
-                return `<div class="medicine-card"><div class="medicine-name">${m.name}</div><div class="small">ID: ${m.id} • ${m.category||''}</div><div style="margin-top:8px">Min Stock: ${m.minStock}</div>${status}<div style="margin-top:10px"><a href="edit_medicine.php?id=${encodeURIComponent(m.id)}">Edit</a></div></div>`;
-            }).join('');
-        }
-
-        MedManager.ensureSampleData();
-        render(MedManager.filterLowStock());
-    </script>
 </body>
 </html>
