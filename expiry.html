@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Expiring Medicines</title>
+    <style>
+        /* Reused design */
+        * { margin:0; padding:0; box-sizing:border-box }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg,#0066ff 0%,#0099ff 100%); min-height:100vh; padding:20px }
+        .container { max-width:1100px; margin:0 auto; background:white; border-radius:12px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.12) }
+        .header { background: linear-gradient(135deg,#0066ff 0%,#0099ff 100%); color:white; padding:20px }
+        .header h1{font-size:1.6rem}
+        .content { padding:20px }
+        .controls { display:flex; gap:8px; align-items:center; margin-bottom:12px }
+        input[type=number]{width:90px;padding:8px;border:1px solid #ddd;border-radius:8px}
+        .medicines-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+        .medicine-card{background:#fff;border:1px solid #eaeaea;border-radius:10px;padding:14px}
+        .medicine-name{font-weight:700}
+        .small{font-size:0.9rem;color:#555}
+        a.back{display:inline-block;margin-top:12px;color:#0066ff}
+    </style>
+    <script>
+        /* Inlined MedManager (from med_manager.js) */
+        (function(global){
+            const STORAGE_KEY = 'medicines';
+            function load(){const raw=localStorage.getItem(STORAGE_KEY); if(!raw) return []; try{return JSON.parse(raw)}catch(e){return[]}}
+            function save(list){localStorage.setItem(STORAGE_KEY, JSON.stringify(list))}
+            function generateId(){return 'MED'+Date.now().toString().slice(-6)}
+            function getById(id){const all=load(); return all.find(m=>m.id===id)||null}
+            function add(m){const all=load(); if(!m.id) m.id=generateId(); all.push(m); save(all); return m}
+            function update(id, updated){const all=load(); const idx=all.findIndex(x=>x.id===id); if(idx===-1) return false; all[idx]=Object.assign({}, all[idx], updated, {id}); save(all); return true}
+            function remove(id){let all=load(); const before=all.length; all=all.filter(x=>x.id!==id); save(all); return all.length<before}
+            function filterExpiring(days=30){const all=load(); const now=new Date(); const limit=new Date(now); limit.setDate(limit.getDate()+Number(days)); return all.filter(m=>{ if(!m.expiryDate) return false; const d=new Date(m.expiryDate); return d<=limit && d>=now })}
+            function filterExpired(){const all=load(); const now=new Date(); return all.filter(m=>m.expiryDate && new Date(m.expiryDate)<now)}
+            function filterLowStock(){const all=load(); return all.filter(m=>Number(m.stock)<=Number(m.minStock))}
+            function ensureSampleData(){const all=load(); if(all.length) return; const sample=[{id:'MED001',name:'Aspirin',category:'Painkiller',stock:150,minStock:50,expiryDate:'2025-12-31',price:5.99},{id:'MED002',name:'Amoxicillin',category:'Antibiotic',stock:30,minStock:100,expiryDate:'2025-06-15',price:12.50},{id:'MED003',name:'Ibuprofen',category:'Painkiller',stock:200,minStock:100,expiryDate:'2026-03-20',price:7.99}]; save(sample)}
+            global.MedManager={load,save,add,update,remove,getById,filterExpiring,filterExpired,filterLowStock,ensureSampleData}
+        })(window);
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header class="header"><h1>🕒 Expiring Soon</h1></header>
+        <div class="content">
+            <div class="controls">
+                <label>Show expiring within <input id="days" type="number" value="30"></label>
+                <button id="filter" class="btn btn-primary">Filter</button>
+            </div>
+
+            <div id="list" class="medicines-list"></div>
+
+            <a class="back" href="medDirectory.html">← Back to Directory</a>
+        </div>
+    </div>
+
+    <script>
+        function render(list){
+            const container = document.getElementById('list');
+            if (!list.length) { container.innerHTML = '<p class="small">No medicines found.</p>'; return; }
+            container.innerHTML = list.map(m=>{
+                return `<div class="medicine-card"><div class="medicine-name">${m.name}</div><div class="small">ID: ${m.id} • ${m.category||''}</div><div style="margin-top:8px">Stock: ${m.stock}</div><div class="small">Expiry: ${m.expiryDate||''}</div><div style="margin-top:10px"><a href="edit_medicine.html?id=${encodeURIComponent(m.id)}">Edit</a></div></div>`;
+            }).join('');
+        }
+
+        document.getElementById('filter').addEventListener('click', ()=>{
+            const days = Number(document.getElementById('days').value) || 30;
+            render(MedManager.filterExpiring(days));
+        });
+
+        MedManager.ensureSampleData();
+        render(MedManager.filterExpiring(30));
+    </script>
+</body>
+</html>
