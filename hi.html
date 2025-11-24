@@ -1,0 +1,42 @@
+#include <iostream>
+#include <mysql_driver.h>
+#include <mysql_connection.h>
+#include <cppconn/statement.h>
+#include <cppconn/resultset.h>
+
+using namespace std;
+
+int main() {
+    try {
+        sql::mysql::MySQL_Driver *driver;
+        sql::Connection *con;
+        sql::Statement *stmt;
+        sql::ResultSet *res;
+
+        // 1. Get MySQL driver instance
+        driver = sql::mysql::get_mysql_driver_instance();
+
+        // 2. Connect to database
+        con = driver->connect("tcp://127.0.0.1:3306", "root", ""); 
+        con->setSchema("pharmacy_db");
+
+        cout << "Connected to MySQL database!" << endl;
+
+        // 3. Simple query
+        stmt = con->createStatement();
+        res = stmt->executeQuery("SELECT * FROM your_table");
+
+        while (res->next()) {
+            cout << "Row: " << res->getString(1) << endl;
+        }
+
+        delete res;
+        delete stmt;
+        delete con;
+    }
+    catch (sql::SQLException &e) {
+        cout << "Error: " << e.what() << endl;
+    }
+
+    return 0;
+}
