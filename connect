@@ -2,10 +2,11 @@
 // db_connect.php
 $servername = "localhost";
 $username = "root";
-$password = ""; // Check with your team if anyone has set a root password!
+$password = ""; 
 $dbname = "pharmacy_db";
+$port = 3307; // IMPORTANT: Your MySQL port
 
-$conn = new mysqli($servername, $username, $password, $dbname);
+$conn = new mysqli($servername, $username, $password, $dbname, $port);
 
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
