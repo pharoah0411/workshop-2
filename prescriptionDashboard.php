@@ -165,7 +165,7 @@ try {
 
         <div class="content">
             <div class="controls">
-                <a href="create_prescription.php" class="btn btn-primary">+ New Prescription</a>
+                <a href="createPrescription.php" class="btn btn-primary">+ New Prescription</a>
                 <form method="GET" style="display:flex; gap:10px; flex:1;">
                     <input type="text" name="search" placeholder="Search Patient Name or ID..." value="<?php echo htmlspecialchars($search); ?>" style="flex:1;">
                     <select name="status">
@@ -210,7 +210,7 @@ try {
                             <td><?php echo htmlspecialchars(is_string($date)? $date : ''); ?></td>
                             <td><span class="badge bg-<?php echo $p['STATUS']; ?>"><?php echo $p['STATUS']; ?></span></td>
                             <td>
-                                <a href="view_prescription.php?id=<?php echo $p['PRESCRIPTION_ID']; ?>" class="action-link">View</a>
+                                <a href="viewPrescription.php?id=<?php echo $p['PRESCRIPTION_ID']; ?>" class="action-link">View</a>
                                 <?php if($p['STATUS'] === 'Pending'): ?>
                                 <form method="POST" style="display:inline" onsubmit="return confirm('Mark as Completed?');">
                                     <input type="hidden" name="action" value="update_status">
