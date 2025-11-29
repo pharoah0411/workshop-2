@@ -1,7 +1,12 @@
-<?php 
-include "db_connect.php";
+<?php
+// 🔵 PostgreSQL connection
+$conn = pg_connect("host=localhost port=5432 dbname=pharmacy_db user=postgres password=YOUR_PASSWORD");
 
-// Insert into PostgreSQL
+if (!$conn) {
+    die("Connection Failed: " . pg_last_error());
+}
+
+// 🔵 Insert Payment
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $prescription_id = $_POST['prescription_id'];
     $total_amount = $_POST['total_amount'];
@@ -12,56 +17,94 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $result = pg_query($conn, $sql);
 
     if ($result) {
-        echo "<p>Payment added successfully!</p>";
+        $message = "Payment added successfully!";
     } else {
-        echo "<p>Error: " . pg_last_error($conn) . "</p>";
+        $message = "Error: " . pg_last_error($conn);
     }
 }
 ?>
 
 <!DOCTYPE html>
 <html>
+<head>
+    <title>Payment Page</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #e6f0ff;
+        }
+        .card {
+            border-radius: 12px;
+            border: none;
+        }
+        .btn-primary {
+            background-color: #0066cc;
+            border: none;
+        }
+        .btn-primary:hover {
+            background-color: #004999;
+        }
+        .table thead {
+            background-color: #0066cc;
+            color: white;
+        }
+    </style>
+</head>
+
 <body>
 
-<h2>Add Payment</h2>
+<div class="container mt-5">
 
-<form method="POST">
-    Prescription ID: <br>
-    <input type="number" name="prescription_id" required><br><br>
+    <!-- 🔵 Message -->
+    <?php if (!empty($message)) { ?>
+        <div class="alert alert-info text-center">
+            <?= $message ?>
+        </div>
+    <?php } ?>
 
-    Total Amount (RM): <br>
-    <input type="text" name="total_amount" required><br><br>
+    <!-- 🔵 Add Payment Form -->
+    <div class="card shadow p-4 mb-4">
+        <h2 class="text-center text-primary">Add Payment</h2>
 
-    <button type="submit">Add Payment</button>
-</form>
+        <form method="POST" class="mt-4">
 
-<hr>
+            <div class="mb-3">
+                <label class="form-label">Prescription ID</label>
+                <input type="number" name="prescription_id" class="form-control" required>
+            </div>
 
-<h2>Payment Records</h2>
+            <div class="mb-3">
+                <label class="form-label">Total Amount (RM)</label>
+                <input type="text" name="total_amount" class="form-control" required>
+            </div>
 
-<?php
-$sql = "SELECT * FROM public.payment ORDER BY payment_id ASC";
-$result = pg_query($conn, $sql);
+            <button type="submit" class="btn btn-primary w-100">Submit Payment</button>
+        </form>
+    </div>
 
-echo "<table border='1' cellpadding='6'>
-        <tr>
-            <th>ID</th>
-            <th>Prescription ID</th>
-            <th>Total Amount</th>
-            <th>Date</th>
-        </tr>";
+    <!-- 🔵 Payment List -->
+    <div class="card shadow p-4">
+        <h2 class="text-center text-primary mb-4">Payment Records</h2>
 
-while ($row = pg_fetch_assoc($result)) {
-    echo "<tr>
-            <td>".$row['payment_id']."</td>
-            <td>".$row['prescription_id']."</td>
-            <td>RM ".$row['total_amount']."</td>
-            <td>".$row['payment_date']."</td>
-          </tr>";
-}
+        <?php
+        $sql = "SELECT * FROM public.payment ORDER BY payment_id ASC";
+        $result = pg_query($conn, $sql);
+        ?>
 
-echo "</table>";
-?>
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th>Payment ID</th>
+                    <th>Prescription ID</th>
+                    <th>Total Amount</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
 
-</body>
-</html>
+            <tbody>
+            <?php while($row = pg_fetch_assoc($result)) { ?>
+                <tr>
+                    <td><?= $row['payment_id'] ?></td>
