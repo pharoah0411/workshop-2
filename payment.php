@@ -2,7 +2,9 @@
 // DB connection
 $conn = pg_connect("host=localhost port=5432 dbname=Workshop user=postgres password=admin");
 
-$payment_id = $_GET['payment_id'];
+if (!$conn) {
+    die("❌ Database Connection Failed: " . pg_last_error());
+}
 
 // Get payment details
 $sql = "SELECT * FROM public.payment WHERE payment_id = $payment_id";
