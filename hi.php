@@ -31,28 +31,25 @@ $conn->close();
 ?>
 
 <?php
-// hi.php
+// hi.php (or any other application file)
 
-// 1. Include the DB connection
-require_once 'db_connect.php'; 
+// This line includes the connection file and creates the $conn object
+require_once 'pharmacy_db'; 
 
-// 2. Query the correct table name: "users"
-$sql = "SELECT name FROM users WHERE role = 'Pharmacist' AND user_id = 2 LIMIT 1";
-
+// Example: Selecting all users from the database
+$sql = "SELECT USERNAME, ROLE, NAME FROM `USER`";
 $result = $conn->query($sql);
 
-// 3. Display result
-if ($result && $result->num_rows > 0) {
-    $row = $result->fetch_assoc();
-
-    echo "<h1>✅ Database Connection Successful!</h1>";
-    echo "<p>Connected to <b>pharmacy_db</b>.</p>";
-    echo "<p>Pharmacist Name: <b>" . htmlspecialchars($row['name']) . "</b></p>";
+if ($result->num_rows > 0) {
+    echo "<h2>User List:</h2>";
+    while($row = $result->fetch_assoc()) {
+        echo "Name: " . $row["NAME"]. " - Role: " . $row["ROLE"]. "<br>";
+    }
 } else {
-    echo "<h1>⚠️ Connected, but no pharmacist found.</h1>";
-    echo "<p>Did you insert the users?</p>";
+    echo "No users found.";
 }
 
-// Close connection
+// Close the connection when done
 $conn->close();
 ?>
+
