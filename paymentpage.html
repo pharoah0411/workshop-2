@@ -21,6 +21,9 @@
         .btn-primary:hover {
             background-color: #004999;
         }
+        .btn-success {
+            border: none;
+        }
         .table thead {
             background-color: #0066cc;
             color: white;
@@ -70,6 +73,7 @@
                     <th>Prescription ID</th>
                     <th>Total Amount</th>
                     <th>Date</th>
+                    <th>Invoice</th>
                 </tr>
             </thead>
 
@@ -80,6 +84,14 @@
                     <td><?= $row['prescription_id'] ?></td>
                     <td>RM <?= $row['total_amount'] ?></td>
                     <td><?= $row['payment_date'] ?></td>
+
+                    <!-- Invoice Button -->
+                    <td>
+                        <a href="invoice.php?payment_id=<?= $row['payment_id'] ?>" 
+                           class="btn btn-success btn-sm">
+                           Generate Invoice
+                        </a>
+                    </td>
                 </tr>
             <?php } ?>
             </tbody>
