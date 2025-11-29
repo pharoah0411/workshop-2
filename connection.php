@@ -7,9 +7,9 @@ error_reporting(E_ALL);
 // ==================================================================================
 // 1. MySQL Connection (Added from 'connect' file)
 // ==================================================================================
-$mysql_servername = "localhost";
-$mysql_username = "root";
-$mysql_password = ""; 
+$mysql_servername = "10.245.156.96";
+$mysql_username = "FARAH";
+$mysql_password = "1234"; 
 $mysql_dbname = "pharmacy_db";
 $mysql_port = 3307; // IMPORTANT: Your MySQL port
 
