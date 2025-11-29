@@ -4,7 +4,7 @@
 $host = "localhost";
 $dbname = "Workshop";
 $user = "postgres";
-$password = "admin";
+$password = "hashedpass";
 
 try {
     // Create PDO connection
