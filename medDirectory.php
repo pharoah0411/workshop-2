@@ -1,4 +1,16 @@
 <?php
+session_start();
+
+// Authentication Check: Redirects non-logged-in users
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+// User details for display
+$userRole = $_SESSION['role'] ?? 'Pharmacist';
+$username = $_SESSION['username'] ?? 'User';
+
 require_once 'connection.php';
 
 // Define constants for calculations
@@ -119,7 +131,6 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
     // Search filter
     if ($search_query !== '') {
         $q = strtolower($search_query);
-        // FIX: Use all-caps column names for search
         $name = strtolower($m['NAME'] ?? '');
         $id = strtolower($m['MEDICINE_ID'] ?? '');
         $category = strtolower($m['CATEGORY_TYPE'] ?? '');
@@ -154,6 +165,51 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medicine Inventory Management</title>
     <style>
+        /* ADDED CSS for Top Navigation */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 30px;
+            background: #1976d2; /* Darker blue */
+            color: white;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            margin-left: 15px;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+
+        .user-info {
+            font-size: 0.9em;
+        }
+
+        .btn-logout {
+            padding: 6px 12px;
+            border: 1px solid white;
+            border-radius: 6px;
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Existing CSS continues below */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); overflow: hidden; }
@@ -215,6 +271,18 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
     </style>
 </head>
 <body>
+    <header class="top-nav">
+        <div class="user-info">
+            Welcome, **<?php echo htmlspecialchars($username); ?>** (<?php echo htmlspecialchars($userRole); ?>)
+        </div>
+        <div class="nav-links">
+            <a href="dashboard.php">🏠 Dashboard</a>
+            <a href="stock.php">⚠️ Stock Alerts</a>
+            <a href="expiry.php">🔴 Expiry Alerts</a>
+            <a href="logout.php" class="btn-logout">Log Out</a>
+        </div>
+    </header>
+    
     <div class="container">
         <header class="header">
             <div class="header-content">
@@ -288,7 +356,6 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
             <div class="medicines-list" id="medicinesList">
                 <?php if (!empty($meds_to_display)): ?>
                     <?php foreach ($meds_to_display as $m):
-                        // FIXES APPLIED HERE: Using all-caps column names for display
                         $id = htmlspecialchars($m['MEDICINE_ID'] ?? '');
                         $name = htmlspecialchars($m['NAME'] ?? '');
                         $category = htmlspecialchars($m['CATEGORY_TYPE'] ?? '');
