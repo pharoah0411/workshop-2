@@ -1,6 +1,6 @@
 <?php
 // DB connection
-$conn = pg_connect("host=localhost port=5432 dbname=Workshop user=postgres password=hashedpass");
+$conn = pg_connect("host=localhost port=5432 dbname=Workshop user=postgres password=admin");
 
 $payment_id = $_GET['payment_id'];
 
