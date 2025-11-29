@@ -29,4 +29,4 @@ $sql = "SELECT * FROM public.payment ORDER BY payment_id ASC";
 $payments = pg_query($conn, $sql);
 
 // 🔵 Include the HTML UI
-include "payment.html";
+include "paymentpage.html";
