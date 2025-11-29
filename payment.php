@@ -108,3 +108,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <?php while($row = pg_fetch_assoc($result)) { ?>
                 <tr>
                     <td><?= $row['payment_id'] ?></td>
+                    <td><?= $row['prescription_id'] ?></td>
+                    <td>RM <?= $row['total_amount'] ?></td>
+                    <td><?= $row['payment_date'] ?></td>
+                </tr>
+            <?php } ?>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+</body>
+</html>
