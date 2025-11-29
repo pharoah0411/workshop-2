@@ -1,6 +1,7 @@
 <?php
 session_start();
-require_once 'db_connection.php';
+// FIXED: Changed from 'db_connection.php' to 'connection.php'
+require_once 'connection.php'; 
 
 // Authentication Check
 if (!isset($_SESSION['user_id'])) {
