@@ -4,6 +4,30 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+// ==================================================================================
+// 1. MySQL Connection (Added from 'connect' file)
+// ==================================================================================
+$mysql_servername = "localhost";
+$mysql_username = "root";
+$mysql_password = ""; 
+$mysql_dbname = "pharmacy_db";
+$mysql_port = 3307; // IMPORTANT: Your MySQL port
+
+// We use $mysql_conn to avoid conflict with the SQL Server $conn below
+$mysql_conn = new mysqli($mysql_servername, $mysql_username, $mysql_password, $mysql_dbname, $mysql_port);
+
+if ($mysql_conn->connect_error) {
+    // You can choose to die() here or just log the error if MySQL is optional
+    // die("MySQL Connection failed: " . $mysql_conn->connect_error);
+    $mysql_error = "MySQL Connection failed: " . $mysql_conn->connect_error;
+} else {
+    // echo "MySQL Connected Successfully"; // Uncomment for testing
+}
+
+// ==================================================================================
+// 2. SQL Server Connection (Existing)
+// ==================================================================================
+
 // Central DB connection file for the workshop app.
 // !!! YOU MUST CONFIGURE THESE 3 VARIABLES FOR YOUR SQL SERVER !!!
 $serverName = "PHAROAHS"; // REPLACE WITH YOUR ACTUAL SQL SERVER NAME/INSTANCE
@@ -20,11 +44,18 @@ $pdo = null;
 if (php_sapi_name() !== 'cli' && realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
     $info = []; $info['php_version'] = phpversion(); $info['server'] = $serverName; $info['database'] = $database; $results = [];
 
+    // Diagnostic: Check MySQL status
+    if (isset($mysql_conn) && !$mysql_conn->connect_error) {
+        echo "SUCCESS: MySQL connected (Port: $mysql_port)\n";
+    } elseif (isset($mysql_error)) {
+        echo "ERROR: MySQL failed - $mysql_error\n";
+    }
+
     // Test sqlsrv extension
     if (function_exists('sqlsrv_connect')) {
         $connectionInfo = ["Database" => $database, "UID" => $uid, "PWD" => $pass];
         $tmp = @sqlsrv_connect($serverName, $connectionInfo);
-        if ($tmp !== false) { echo "SUCCESS: connected (sqlsrv)"; exit; }
+        if ($tmp !== false) { echo "SUCCESS: SQL Server connected (sqlsrv)"; exit; }
         $results['sqlsrv'] = 'available but connection failed';
     } else { $results['sqlsrv'] = 'extension not installed'; }
 
@@ -34,7 +65,7 @@ if (php_sapi_name() !== 'cli' && realpath(__FILE__) === realpath($_SERVER['SCRIP
             if (in_array('sqlsrv', PDO::getAvailableDrivers(), true)) {
                 $dsn = "sqlsrv:Server={$serverName};Database={$database}";
                 $tmp = new PDO($dsn, $uid, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-                echo "SUCCESS: connected (pdo_sqlsrv)"; exit;
+                echo "SUCCESS: SQL Server connected (pdo_sqlsrv)"; exit;
             } else { $results['pdo_sqlsrv'] = 'pdo sqlsrv driver not available'; }
         } catch (PDOException $e) { $results['pdo_sqlsrv_error'] = $e->getMessage(); }
     } else { $results['pdo'] = 'PDO not available'; }
@@ -46,12 +77,12 @@ if (php_sapi_name() !== 'cli' && realpath(__FILE__) === realpath($_SERVER['SCRIP
         if ($uid !== '') { $odbcDsn .= "Uid={$uid};Pwd={$pass};"; }
         else { $odbcDsn .= "Trusted_Connection=Yes;"; }
         $tmp = new PDO($odbcDsn);
-        echo "SUCCESS: connected (pdo_odbc)"; exit;
+        echo "SUCCESS: SQL Server connected (pdo_odbc)"; exit;
     } catch (Exception $e) { $results['pdo_odbc'] = $e->getMessage(); }
 
     // If we reach here, no driver connected.
     header('Content-Type: text/plain; charset=utf-8');
-    echo "ERROR: not connected\n\n";
+    echo "ERROR: SQL Server not connected\n\n";
     echo "Server/DB: " . $info['server'] . " / " . $info['database'] . "\n\n";
     echo "Driver test results: \n";
     foreach ($results as $k => $v) { echo " - $k: " . (is_array($v) ? implode(',', $v) : $v) . "\n"; }
@@ -90,5 +121,4 @@ try {
     // All connection attempts failed. $conn and $pdo remain null.
     return;
 }
-
 ?>
