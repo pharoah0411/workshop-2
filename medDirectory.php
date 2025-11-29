@@ -1,18 +1,19 @@
 <?php
 session_start();
 
-// Authentication Check
+// Authentication Check: Redirects non-logged-in users
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
 
+// User details for display
 $userRole = $_SESSION['role'] ?? 'Pharmacist';
 $username = $_SESSION['username'] ?? 'User';
 
 require_once 'connection.php';
 
-// Define constants
+// Define constants for calculations
 $DAYS_EXPIRING_SOON = 30;
 
 // --- 1. Handle Deletion POST Request ---
@@ -20,8 +21,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $id_to_delete = intval($_POST['id']);
     if ($id_to_delete > 0) {
         try {
-            // [NEW] MySQL Logic
-            if (isset($mysql_conn)) {
+            // [NEW] PostgreSQL Deletion Logic
+            if (isset($pg_conn)) {
+                $stmt = $pg_conn->prepare("DELETE FROM MEDICINE WHERE MEDICINE_ID = :id");
+                $stmt->execute([':id' => $id_to_delete]);
+            }
+            // [NEW] MySQL Deletion Logic
+            elseif (isset($mysql_conn)) {
                 $stmt = $mysql_conn->prepare("DELETE FROM Medicine WHERE MEDICINE_ID = ?");
                 $stmt->bind_param("i", $id_to_delete);
                 $stmt->execute();
@@ -31,38 +37,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             elseif (isset($pdo) && $pdo instanceof PDO) {
                 $stmt = $pdo->prepare('DELETE FROM Medicine WHERE MEDICINE_ID = :id');
                 $stmt->execute([':id' => $id_to_delete]);
-            } 
+            }
             // [EXISTING] SQLSRV Logic
             elseif (isset($conn)) {
                 $sql = 'DELETE FROM Medicine WHERE MEDICINE_ID = ?';
                 sqlsrv_query($conn, $sql, [$id_to_delete]);
             }
         } catch (Exception $e) {
-            // Error handling
+            // Error handling placeholder
         }
     }
+    // Redirect to prevent form resubmission and clear the POST state
     header('Location: medDirectory.php');
     exit;
 }
 
-// Get input from query parameters
+// Get input from query parameters for search/filter
 $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
 $filter_type = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 
 // --- 2. Fetch All Medicines from DB ---
 $all_meds = [];
 $connection_error_message = ''; 
-$min_stock_defaults = ['default' => 50];
+$min_stock_defaults = [ 'default' => 50 ];
 
 try {
     $sql = "SELECT MEDICINE_ID, NAME, CATEGORY_TYPE, QUANTITY_IN_STOCK, EXPIRY_DATE, SUPPLIER_NAME, UNIT_PRICE, STOCK_PRICE FROM Medicine";
     
-    // [NEW] MySQL Fetch Logic
-    if (isset($mysql_conn)) {
-        $result = $mysql_conn->query($sql);
-        if ($result) {
-            while ($row = $result->fetch_assoc()) {
-                // Normalize keys to UPPERCASE to match existing PHP logic
+    // [NEW] PostgreSQL Fetch Logic
+    if (isset($pg_conn)) {
+        $stmt = $pg_conn->query($sql);
+        if ($stmt) {
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                // IMPORTANT: Postgres returns lowercase keys ('name'). We convert to UPPERCASE ('NAME') to match the UI.
                 $r = array_change_key_case($row, CASE_UPPER);
                 
                 // Format Date
@@ -75,10 +82,28 @@ try {
                 $all_meds[] = $r;
             }
         } else {
+             $err = $pg_conn->errorInfo();
+             $connection_error_message = 'PostgreSQL Query Failed: ' . ($err[2] ?? 'Unknown error');
+        }
+    }
+    // [NEW] MySQL Fetch Logic
+    elseif (isset($mysql_conn)) {
+        $result = $mysql_conn->query($sql);
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $r = array_change_key_case($row, CASE_UPPER);
+                if (!empty($r['EXPIRY_DATE'])) {
+                    $r['EXPIRY_DATE'] = date('Y-m-d', strtotime($r['EXPIRY_DATE']));
+                }
+                $id_key = $r['MEDICINE_ID'] ?? null;
+                $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
+                $all_meds[] = $r;
+            }
+        } else {
             $connection_error_message = 'MySQL Query Failed: ' . $mysql_conn->error;
         }
     }
-    // [EXISTING] PDO Logic
+    // [EXISTING] PDO (SQL Server) Logic
     elseif (isset($pdo) && $pdo !== null) {
         $stmt = $pdo->query($sql);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -92,12 +117,14 @@ try {
             $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
             $all_meds[] = $r;
         }
-    } 
-    // [EXISTING] SQLSRV Logic
-    elseif (isset($conn) && $conn !== null) {
+    } elseif (isset($conn) && $conn !== null) {
+        // SQLSRV fetch logic
         $stmt = sqlsrv_query($conn, $sql);
         if ($stmt === false) {
-            $connection_error_message = 'SQL Query Failed.';
+            $sqlsrv_errors = sqlsrv_errors(SQLSRV_ERR_ERRORS);
+            $error_msg = 'SQL Query Failed.';
+            if ($sqlsrv_errors) $error_msg .= ' Details: ' . print_r($sqlsrv_errors, true);
+            $connection_error_message = '❌ DATABASE QUERY FAILED: ' . $error_msg;
         } else {
             while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
                 if (!empty($r['EXPIRY_DATE']) && $r['EXPIRY_DATE'] instanceof DateTime) {
@@ -117,7 +144,7 @@ try {
     $connection_error_message = '❌ PHP EXCEPTION: ' . htmlspecialchars($e->getMessage());
 }
 
-// --- 3. Calculate Stats (No changes needed here as $all_meds is standardized) ---
+// --- 3. Calculate Stats from all_meds (Standardized Logic) ---
 $now_ts = time();
 $expiring_limit_ts = strtotime("+{$DAYS_EXPIRING_SOON} days");
 $totalMedicines = count($all_meds);
@@ -130,18 +157,24 @@ foreach ($all_meds as $m) {
     $minStock = (int)($m['minStock'] ?? 0);
     $expiry = !empty($m['EXPIRY_DATE']) ? strtotime($m['EXPIRY_DATE']) : null;
     
-    if ($stock <= $minStock) $lowStockCount++;
+    if ($stock <= $minStock) {
+        $lowStockCount++;
+    }
+
     if ($expiry) {
-        if ($expiry < $now_ts) $expiredCount++;
-        elseif ($expiry > $now_ts && $expiry <= $expiring_limit_ts) $expiringCount++;
+        if ($expiry < $now_ts) {
+            $expiredCount++;
+        } elseif ($expiry > $now_ts && $expiry <= $expiring_limit_ts) {
+            $expiringCount++;
+        }
     }
 }
 
 // --- 4. Apply Filter and Search ---
 $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $filter_type, $now_ts, $expiring_limit_ts) {
+    // Search filter
     if ($search_query !== '') {
         $q = strtolower($search_query);
-        // Using null coalescing operator in case keys are missing
         $name = strtolower($m['NAME'] ?? '');
         $id = strtolower($m['MEDICINE_ID'] ?? '');
         $category = strtolower($m['CATEGORY_TYPE'] ?? '');
@@ -149,7 +182,8 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
             return false;
         }
     }
-    
+
+    // Category filter
     $stock = (int)($m['QUANTITY_IN_STOCK'] ?? 0);
     $minStock = (int)($m['minStock'] ?? 0);
     $expiry = !empty($m['EXPIRY_DATE']) ? strtotime($m['EXPIRY_DATE']) : null;
@@ -170,15 +204,51 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medicine Inventory Management</title>
     <style>
-        /* ... (Paste your existing CSS here) ... */
-        /* For brevity, I am not repeating the 200 lines of CSS, assume it is here */
-        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 30px; background: #1976d2; color: white; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); }
-        .nav-links a { color: white; text-decoration: none; margin-left: 15px; font-weight: 500; transition: opacity 0.2s; }
-        .nav-links a:hover { opacity: 0.8; }
-        .user-info { font-size: 0.9em; }
-        .btn-logout { padding: 6px 12px; border: 1px solid white; border-radius: 6px; background: transparent; color: white; cursor: pointer; text-decoration: none; font-size: 0.9em; }
-        .btn-logout:hover { background: rgba(255, 255, 255, 0.1); }
-        /* Existing CSS */
+        /* ADDED CSS for Top Navigation */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 30px;
+            background: #1976d2; /* Darker blue */
+            color: white;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            margin-left: 15px;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+
+        .user-info {
+            font-size: 0.9em;
+        }
+
+        .btn-logout {
+            padding: 6px 12px;
+            border: 1px solid white;
+            border-radius: 6px;
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Existing CSS continues below */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); overflow: hidden; }
