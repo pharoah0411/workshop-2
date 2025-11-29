@@ -1,6 +1,7 @@
 <?php
 // 🔵 PostgreSQL connection
-$conn = pg_connect("host=localhost port=5432 dbname=pharmacy_db user=postgres password=YOUR_PASSWORD");
+$conn = pg_connect("host=localhost port=5432 dbname=pharmacy_db user=postgres password=hashedpass");
+
 
 if (!$conn) {
     die("Connection Failed: " . pg_last_error());
