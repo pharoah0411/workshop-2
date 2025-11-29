@@ -11,7 +11,7 @@ $mysql_servername = "10.245.156.96";
 $mysql_username = "FARAH";
 $mysql_password = "1234"; 
 $mysql_dbname = "pharmacy_db";
-$mysql_port = 3307; // IMPORTANT: Your MySQL port
+$mysql_port = 3306; // IMPORTANT: Your MySQL port
 
 // We use $mysql_conn to avoid conflict with the SQL Server $conn below
 $mysql_conn = new mysqli($mysql_servername, $mysql_username, $mysql_password, $mysql_dbname, $mysql_port);
