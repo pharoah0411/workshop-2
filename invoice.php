@@ -12,3 +12,4 @@ if (!$pay) {
 }
 
 include "invoice_view.html";
+
