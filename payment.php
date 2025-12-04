@@ -39,4 +39,4 @@ try {
 }
 
 // Load UI
-include "payment.html";
+include "paymentpage.html";
