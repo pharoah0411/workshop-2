@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sales Receipt</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        .receipt-box { max-width: 700px; margin: auto; padding: 20px; background: white; box-shadow: 0px 0px 10px #ccc; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+
+<body>
+
+<div class="receipt-box mt-5">
+
+    <h2 class="text-center text-primary">Sales Receipt</h2>
+
+    <p><b>Sale ID:</b> <?= $sale['sale_id'] ?></p>
+    <p><b>Patient:</b> <?= $sale['patient_name'] ?></p>
+    <p><b>Date:</b> <?= $sale['sale_date'] ?></p>
+
+    <hr>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Medicine</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Subtotal</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <?php foreach ($items as $row) { ?>
+            <tr>
+                <td><?= $row['medicine_name'] ?></td>
+                <td><?= $row['quantity'] ?></td>
+                <td>RM <?= $row['price'] ?></td>
+                <td>RM <?= $row['subtotal'] ?></td>
+            </tr>
+            <?php } ?>
+        </tbody>
+    </table>
+
+    <h4 class="text-end">Total: RM <?= $sale['total_amount'] ?></h4>
+
+    <div class="text-center no-print mt-3">
+        <button class="btn btn-primary" onclick="window.print()">Print</button>
+        <a href="sales_dashboard.php" class="btn btn-secondary">Back</a>
+    </div>
+
+</div>
+
+</body>
+</html>
