@@ -1,94 +1,80 @@
 <?php
-// --- MANDATORY ERROR REPORTING FOR DEBUGGING ---
+// connection.php
+
+// --- ERROR REPORTING ---
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Central DB connection file for the workshop app.
-// !!! YOU MUST CONFIGURE THESE 3 VARIABLES FOR YOUR SQL SERVER !!!
-$serverName = "PHAROAHS"; // REPLACE WITH YOUR ACTUAL SQL SERVER NAME/INSTANCE
-$database = "Workshop";
-$uid = ""; // REPLACE WITH YOUR SQL LOGIN USERNAME (or leave empty for Windows Auth)
-$pass = ""; // REPLACE WITH YOUR SQL LOGIN PASSWORD (or leave empty for Windows Auth)
-
-// Variables for connection objects
-$dbType = null;
+// Initialize connection variables
+$mysql_conn = null;
+$mysql_conn2 = null; // <--- NEW VARIABLE
+$pg_conn = null;
+$pdo = null; 
 $conn = null; 
-$pdo = null;  
 
-// --- DIAGNOSTIC MODE: If this file is accessed directly, it performs a test ---
-if (php_sapi_name() !== 'cli' && realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
-    $info = []; $info['php_version'] = phpversion(); $info['server'] = $serverName; $info['database'] = $database; $results = [];
+// ==================================================================================
+// 2. MySQL Connection #2 (Secondary)
+// ==================================================================================
+// !!! PLEASE UPDATE THESE CREDENTIALS FOR YOUR SECOND DATABASE !!!
+$mysql2_servername = "10.245.156.39"; // Enter Second IP Here
+$mysql2_username = "farah";           // Enter Username
+$mysql2_password = "Syimazmi201.";            // Enter Password
+$mysql2_dbname = "medicine prescription";       // Enter Database Name
+$mysql2_port = 3306; 
 
-    // Test sqlsrv extension
+$temp_mysql2 = @new mysqli($mysql2_servername, $mysql2_username, $mysql2_password, $mysql2_dbname, $mysql2_port);
+
+if ($temp_mysql2->connect_error) {
+    $mysql2_error = "MySQL #2 Failed: " . $temp_mysql2->connect_error;
+} else {
+    $mysql_conn2 = $temp_mysql2;
+}
+
+// ==================================================================================
+// 3. PostgreSQL Connection - 10.245.156.44
+// ==================================================================================
+$pg_host = "10.245.156.44";
+$pg_port = "5432"; 
+$pg_dbname = "Workshop"; // Using 'Workshop' as per your snippet
+$pg_user = "farah"; 
+$pg_password = "12345"; 
+
+try {
+    $dsn = "pgsql:host=$pg_host;port=$pg_port;dbname=$pg_dbname";
+    $pg_conn = new PDO($dsn, $pg_user, $pg_password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+} catch (PDOException $e) {
+    $pg_error = "PostgreSQL Failed: " . $e->getMessage();
+}
+
+// ==================================================================================
+// 4. SQL Server Connection - IP Address
+// ==================================================================================
+// Replace with your specific IP and Port (Default SQL Server port is 1433)
+$serverIp = "10.245.156.110"; // Example IP
+$serverPort = "1433";        // Example Port
+$serverName = "$serverIp, $serverPort"; // Format: "IP, PORT"
+
+$database = "Workshop";
+$uid = "myuser";       // Your Database Username
+$pass = "StrongPass123!"; // Your Database Password
+
+try {
+    // Try PDO first
+    // Note: 'tcp:' forces a TCP/IP connection
+    $dsn = "sqlsrv:Server={$serverName};Database={$database}";
+    $pdo = new PDO($dsn, $uid, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    
+} catch (PDOException $e) {
+    // If PDO fails, try legacy sqlsrv
     if (function_exists('sqlsrv_connect')) {
         $connectionInfo = ["Database" => $database, "UID" => $uid, "PWD" => $pass];
-        $tmp = @sqlsrv_connect($serverName, $connectionInfo);
-        if ($tmp !== false) { echo "SUCCESS: connected (sqlsrv)"; exit; }
-        $results['sqlsrv'] = 'available but connection failed';
-    } else { $results['sqlsrv'] = 'extension not installed'; }
-
-    // Test PDO + sqlsrv driver
-    if (class_exists('PDO')) {
-        try {
-            if (in_array('sqlsrv', PDO::getAvailableDrivers(), true)) {
-                $dsn = "sqlsrv:Server={$serverName};Database={$database}";
-                $tmp = new PDO($dsn, $uid, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-                echo "SUCCESS: connected (pdo_sqlsrv)"; exit;
-            } else { $results['pdo_sqlsrv'] = 'pdo sqlsrv driver not available'; }
-        } catch (PDOException $e) { $results['pdo_sqlsrv_error'] = $e->getMessage(); }
-    } else { $results['pdo'] = 'PDO not available'; }
-
-    // Try PDO ODBC fallback
-    try {
-        $odbcDriver = '{ODBC Driver 18 for SQL Server}';
-        $odbcDsn = "odbc:Driver={$odbcDriver};Server={$serverName};Database={$database};";
-        if ($uid !== '') { $odbcDsn .= "Uid={$uid};Pwd={$pass};"; }
-        else { $odbcDsn .= "Trusted_Connection=Yes;"; }
-        $tmp = new PDO($odbcDsn);
-        echo "SUCCESS: connected (pdo_odbc)"; exit;
-    } catch (Exception $e) { $results['pdo_odbc'] = $e->getMessage(); }
-
-    // If we reach here, no driver connected.
-    header('Content-Type: text/plain; charset=utf-8');
-    echo "ERROR: not connected\n\n";
-    echo "Server/DB: " . $info['server'] . " / " . $info['database'] . "\n\n";
-    echo "Driver test results: \n";
-    foreach ($results as $k => $v) { echo " - $k: " . (is_array($v) ? implode(',', $v) : $v) . "\n"; }
-    echo "\nACTION: Check \$serverName, \$uid, \$pass, and ensure SQL drivers are installed for PHP.\n";
-    exit;
+        $conn = @sqlsrv_connect($serverName, $connectionInfo);
+        
+        if ($conn === false) {
+             // Optional: Uncomment to debug connection errors
+             // die(print_r(sqlsrv_errors(), true));
+        }
+    }
 }
-// --- END DIAGNOSTIC MODE ---
-
-
-// Try sqlsrv extension first
-if (function_exists('sqlsrv_connect')) {
-    $connectionInfo = ["Database" => $database, "UID" => $uid, "PWD" => $pass];
-    $tmp = @sqlsrv_connect($serverName, $connectionInfo);
-    if ($tmp !== false) { $conn = $tmp; $dbType = 'sqlsrv'; return; }
-}
-
-// Try PDO with sqlsrv driver
-if (class_exists('PDO')) {
-    try {
-        $dsn = "sqlsrv:Server={$serverName};Database={$database}";
-        $options = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION];
-        $tmp = new PDO($dsn, $uid, $pass, $options);
-        $pdo = $tmp; $dbType = 'pdo_sqlsrv'; return;
-    } catch (PDOException $e) { /* continue to ODBC fallback quietly */ }
-}
-
-// Fallback: PDO ODBC
-try {
-    $odbcDriver = '{ODBC Driver 18 for SQL Server}';
-    $odbcDsn = "odbc:Driver={$odbcDriver};Server={$serverName};Database={$database};";
-    if ($uid !== '') { $odbcDsn .= "Uid={$uid};Pwd={$pass};"; }
-    else { $odbcDsn .= "Trusted_Connection=Yes;"; }
-    $tmp = new PDO($odbcDsn);
-    $pdo = $tmp; $dbType = 'pdo_odbc'; return;
-} catch (Exception $e) {
-    // All connection attempts failed. $conn and $pdo remain null.
-    return;
-}
-
 ?>

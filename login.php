@@ -1,152 +1,167 @@
 <?php
+require_once 'connection.php';
+
+// Start session to manage user state
 session_start();
 
-// Database connection
-$host = "localhost";
-$port = "5432";
-$dbname = "Workshop";
-$user = "postgres";
-$password = "admin";
+$error = '';
+$username = '';
 
-try {
-    $conn = new PDO("pgsql:host=$host;port=$port;dbname=$dbname;", $user, $password);
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} 
-catch (PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
+// Check if user is already logged in
+if (isset($_SESSION['user_id'])) {
+    header('Location: dashboard.php');
+    exit;
 }
 
-// Handle login
-$message = "";
-$message_type = "";
+// --- Handle POST Request for Login ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username = isset($_POST['username']) ? trim($_POST['username']) : '';
+    $password = isset($_POST['password']) ? $_POST['password'] : '';
 
-if (isset($_POST['login'])) {
-    $username = $_POST['username'];
-    $password_input = $_POST['password'];
-
-    $stmt = $conn->prepare("SELECT * FROM \"user\" WHERE username = :username LIMIT 1");
-    $stmt->execute(['username' => $username]);
-    $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($user_data) {
-        if ($password_input === $user_data['password']) {
-            $_SESSION['user_id'] = $user_data['user_id'];
-            $_SESSION['username'] = $user_data['username'];
-            $_SESSION['role'] = $user_data['role'];
-
-            $message = "Login successful! Redirecting...";
-            $message_type = "success";
-
-            header("refresh:1; url=user_management.php");
-        } else {
-            $message = "Invalid password!";
-            $message_type = "error";
-        }
+    if ($username === '' || $password === '') {
+        $error = "Please enter both username and password.";
     } else {
-        $message = "Username not found!";
-        $message_type = "error";
+        $user = null;
+
+        try {
+            // ---------------------------------------------------------
+            // 1. Check SQL Server (Primary check)
+            // ---------------------------------------------------------
+            // Check PDO driver
+            if (!$user && isset($pdo) && $pdo instanceof PDO) {
+                $stmt = $pdo->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?");
+                $stmt->execute([$username]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($res) $user = array_change_key_case($res, CASE_UPPER);
+            } 
+            // Check Legacy SQLSRV driver
+            // FIX: Added "&& $conn !== false" to prevent the TypeError if connection failed
+            elseif (!$user && isset($conn) && $conn !== false) {
+                $sql = "SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?";
+                $params = [$username];
+                $res = sqlsrv_query($conn, $sql, $params);
+                if ($res !== false && sqlsrv_has_rows($res)) {
+                    $row = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC);
+                    if ($row) $user = array_change_key_case($row, CASE_UPPER);
+                }
+            }
+
+            // ---------------------------------------------------------
+            // 2. Check MySQL Connection #1
+            // ---------------------------------------------------------
+            if (!$user && isset($mysql_conn) && $mysql_conn instanceof mysqli) {
+                $stmt = $mysql_conn->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM `USER` WHERE USERNAME = ?");
+                if ($stmt) {
+                    $stmt->bind_param("s", $username);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    if ($result->num_rows > 0) {
+                        $res = $result->fetch_assoc();
+                        $user = array_change_key_case($res, CASE_UPPER);
+                    }
+                    $stmt->close();
+                }
+            }
+
+            // ---------------------------------------------------------
+            // 3. Check MySQL Connection #2
+            // ---------------------------------------------------------
+            if (!$user && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
+                $stmt = $mysql_conn2->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM `USER` WHERE USERNAME = ?");
+                if ($stmt) {
+                    $stmt->bind_param("s", $username);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    if ($result->num_rows > 0) {
+                        $res = $result->fetch_assoc();
+                        $user = array_change_key_case($res, CASE_UPPER);
+                    }
+                    $stmt->close();
+                }
+            }
+
+            // ---------------------------------------------------------
+            // 4. Check PostgreSQL Connection
+            // ---------------------------------------------------------
+            if (!$user && isset($pg_conn) && $pg_conn instanceof PDO) {
+                $stmt = $pg_conn->prepare('SELECT "USER_ID", "USERNAME", "PASSWORD", "ROLE" FROM "USER" WHERE "USERNAME" = ?');
+                $stmt->execute([$username]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($res) $user = array_change_key_case($res, CASE_UPPER);
+            }
+
+            // ---------------------------------------------------------
+            // Final Authentication Logic
+            // ---------------------------------------------------------
+            if ($user && $user['PASSWORD'] === $password) {
+                $_SESSION['user_id'] = $user['USER_ID'];
+                $_SESSION['username'] = $user['USERNAME'];
+                $_SESSION['role'] = $user['ROLE'];
+
+                header('Location: dashboard.php');
+                exit;
+            } else {
+                // If user was not found in ANY database or password didn't match
+                $error = "Invalid username or password.";
+            }
+
+        } catch (Exception $e) {
+            $error = 'Login error: ' . htmlspecialchars($e->getMessage());
+        }
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login - Pharmacy System</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Login</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: linear-gradient(to bottom right, #d6f5e6, #c2e9fb);
-            height: 100vh;
-            margin: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .login-card {
-            width: 350px;
-            background: white;
-            padding: 35px 30px;
-            border-radius: 12px;
-            box-shadow: 0px 6px 20px rgba(0,0,0,0.15);
-            text-align: center;
-        }
-
-        .login-card h2 {
-            margin-bottom: 10px;
-            color: #1e665d;
-        }
-
-        .login-card p.subtitle {
-            margin-top: -5px;
-            margin-bottom: 20px;
-            color: #555;
-            font-size: 14px;
-        }
-
-        .message {
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-
-        .error { background: #ffdddd; color: #c62828; border: 1px solid #e57373; }
-        .success { background: #ddffdd; color: #2e7d32; border: 1px solid #81c784; }
-
-        input[type=text], input[type=password] {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0 15px 0;
-            border: 1px solid #aaa;
-            border-radius: 6px;
-            font-size: 15px;
-        }
-
-        input[type=submit] {
-            width: 100%;
-            padding: 12px;
-            background: #27ae60;
-            border: none;
-            color: white;
-            font-size: 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: 0.2s;
-            font-weight: bold;
-        }
-
-        input[type=submit]:hover {
-            background: #1e874b;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); min-height: 100vh; padding: 20px; display: flex; justify-content: center; align-items: center; }
+        .container { max-width: 400px; width: 100%; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); color: white; padding: 24px 20px; text-align: center; }
+        .header-content h1 { font-size: 1.6em; }
+        .content { padding: 24px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display:block; color:#333; font-weight:600; margin-bottom:6px; }
+        .form-group input { width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; }
+        .form-actions { margin-top:16px; }
+        .btn { width: 100%; padding:10px 16px; border-radius:8px; border:none; cursor:pointer; font-size: 1em; font-weight: 500; transition: all 0.3s ease; }
+        .btn-primary { background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%); color:#fff; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 102, 255, 0.4); }
+        .error-message { color: red; background: #ffe0e0; border: 1px solid red; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-weight: 600; text-align: center; }
     </style>
 </head>
-
 <body>
+  <div class="container">
+    <header class="header">
+      <div class="header-content">
+        <h1>🔑 Inventory Login</h1>
+      </div>
+    </header>
 
-<div class="login-card">
-    <h2>Pharmacy System</h2>
-    <p class="subtitle">Please login to continue</p>
+    <div class="content">
+      <?php if (!empty($error)): ?>
+        <p class="error-message"><?php echo $error; ?></p>
+      <?php endif; ?>
 
-    <?php if ($message): ?>
-        <div class="message <?= $message_type ?>">
-            <?= $message ?>
+      <form method="POST" action="login.php">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" required value="<?php echo htmlspecialchars($username); ?>">
         </div>
-    <?php endif; ?>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required>
+        </div>
 
-    <form method="POST" action="">
-        <label style="float:left;font-size:14px;color:#333;">Username</label>
-        <input type="text" name="username" required>
-
-        <label style="float:left;font-size:14px;color:#333;">Password</label>
-        <input type="password" name="password" required>
-
-        <input type="submit" name="login" value="Login">
-    </form>
-</div>
-
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Log In</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </body>
 </html>

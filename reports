@@ -1,0 +1,173 @@
+<?php
+require_once 'db_connect.php';
+
+// ====================== SUMMARY CARDS ======================
+$totalUsers = $conn->query("SELECT COUNT(*) AS total FROM users")->fetch_assoc()['total'];
+$totalPatients = $conn->query("SELECT COUNT(*) AS total FROM patient")->fetch_assoc()['total'];
+$totalPrescriptions = $conn->query("SELECT COUNT(*) AS total FROM prescription")->fetch_assoc()['total'];
+$lowStock = $conn->query("SELECT COUNT(*) AS total FROM medicine WHERE quantity_in_stock < 20")->fetch_assoc()['total'];
+
+$todaysSales = $conn->query("
+    SELECT IFNULL(SUM(total_amount), 0) AS total 
+    FROM payment 
+    WHERE payment_date = CURDATE()
+")->fetch_assoc()['total'];
+
+$monthlySales = $conn->query("
+    SELECT IFNULL(SUM(total_amount), 0) AS total 
+    FROM payment 
+    WHERE MONTH(payment_date) = MONTH(CURDATE())
+    AND YEAR(payment_date) = YEAR(CURDATE())
+")->fetch_assoc()['total'];
+
+
+// ====================== SALES CHART (DAILY SALES) ======================
+$salesData = $conn->query("
+    SELECT DAY(payment_date) AS day, SUM(total_amount) AS total
+    FROM payment
+    WHERE MONTH(payment_date) = MONTH(CURDATE())
+    GROUP BY DAY(payment_date)
+    ORDER BY day
+");
+
+$salesDays = [];
+$salesTotals = [];
+
+while ($row = $salesData->fetch_assoc()) {
+    $salesDays[] = $row['day'];
+    $salesTotals[] = $row['total'];
+}
+
+
+
+// ====================== TOP 5 MEDICINES CHART ======================
+$topMed = $conn->query("
+    SELECT m.name, COUNT(pd.medicine_id) AS times_prescribed
+    FROM prescription_detail pd
+    JOIN medicine m ON pd.medicine_id = m.medicine_id
+    GROUP BY pd.medicine_id
+    ORDER BY times_prescribed DESC
+    LIMIT 5
+");
+
+$medNames = [];
+$medCounts = [];
+
+while ($row = $topMed->fetch_assoc()) {
+    $medNames[] = $row['name'];
+    $medCounts[] = $row['times_prescribed'];
+}
+
+
+// ====================== STOCK PIE CHART ======================
+$stockData = $conn->query("
+    SELECT name, quantity_in_stock
+    FROM medicine
+    ORDER BY quantity_in_stock ASC 
+    LIMIT 5
+");
+
+$stockNames = [];
+$stockQty = [];
+
+while ($row = $stockData->fetch_assoc()) {
+    $stockNames[] = $row['name'];
+    $stockQty[] = $row['quantity_in_stock'];
+}
+
+$conn->close();
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reports & Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: Arial; margin: 20px; background: #f5f6fa; }
+        .card-container { display: flex; gap: 20px; margin-bottom: 25px; }
+        .card {
+            background: white;
+            flex: 1;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .charts-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        canvas { background: white; padding: 20px; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+<h1>📊 Reports & Analytics Dashboard</h1>
+
+<div class="card-container">
+    <div class="card"><h2><?= $totalUsers ?></h2><p>Total Users</p></div>
+    <div class="card"><h2><?= $totalPatients ?></h2><p>Total Patients</p></div>
+    <div class="card"><h2><?= $totalPrescriptions ?></h2><p>Total Prescriptions</p></div>
+    <div class="card"><h2><?= $lowStock ?></h2><p>Low Stock Medicines</p></div>
+</div>
+
+<div class="card-container">
+    <div class="card"><h2>RM <?= number_format($todaysSales, 2) ?></h2><p>Today's Sales</p></div>
+    <div class="card"><h2>RM <?= number_format($monthlySales, 2) ?></h2><p>Monthly Sales</p></div>
+</div>
+
+<h2>📈 Charts</h2>
+
+<div class="charts-container">
+
+    <!-- Sales Line Chart -->
+    <canvas id="salesChart"></canvas>
+
+    <!-- Top Medicines Bar Chart -->
+    <canvas id="medChart"></canvas>
+
+    <!-- Stock Pie Chart -->
+    <canvas id="stockChart"></canvas>
+
+</div>
+
+<script>
+    // ===================== SALES LINE CHART =====================
+    new Chart(document.getElementById('salesChart'), {
+        type: 'line',
+        data: {
+            labels: <?= json_encode($salesDays) ?>,
+            datasets: [{
+                label: 'Daily Sales (RM)',
+                data: <?= json_encode($salesTotals) ?>,
+                fill: false,
+                tension: 0.3
+            }]
+        }
+    });
+
+    // ===================== TOP MEDICINES BAR CHART =====================
+    new Chart(document.getElementById('medChart'), {
+        type: 'bar',
+        data: {
+            labels: <?= json_encode($medNames) ?>,
+            datasets: [{
+                label: 'Times Prescribed',
+                data: <?= json_encode($medCounts) ?>
+            }]
+        }
+    });
+
+    // ===================== STOCK PIE CHART =====================
+    new Chart(document.getElementById('stockChart'), {
+        type: 'pie',
+        data: {
+            labels: <?= json_encode($stockNames) ?>,
+            datasets: [{
+                data: <?= json_encode($stockQty) ?>
+            }]
+        }
+    });
+</script>
+
+</body>
+</html>

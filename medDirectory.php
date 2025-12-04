@@ -1,151 +1,180 @@
 <?php
+session_start();
+
+// Authentication Check
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
+$userRole = $_SESSION['role'] ?? 'Pharmacist';
+$username = $_SESSION['username'] ?? 'User';
+
 require_once 'connection.php';
 
-// Define constants for calculations
+// --- Determine Connection Status Strings for Display ---
+$status_mysql1 = ($mysql_conn) ? "✅ Connected" : "❌ Failed";
+$status_mysql2 = ($mysql_conn2) ? "✅ Connected" : "❌ Failed";
+$status_pg = ($pg_conn) ? "✅ Connected" : "❌ Failed";
+$status_sql = ($pdo || $conn) ? "✅ Connected" : "❌ Failed";
+
+// Define constants
 $DAYS_EXPIRING_SOON = 30;
 
-// --- 1. Handle Deletion POST Request ---
+// --- 1. Handle Deletion ---
+// Note: This attempts to delete from ALL connected DBs to ensure consistency
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete' && isset($_POST['id'])) {
     $id_to_delete = intval($_POST['id']);
     if ($id_to_delete > 0) {
         try {
-            if (isset($pdo) && $pdo instanceof PDO) {
-                // FIX: Use MEDICINE_ID
-                $stmt = $pdo->prepare('DELETE FROM Medicine WHERE MEDICINE_ID = :id');
-                $stmt->execute([':id' => $id_to_delete]);
-            } elseif (isset($conn)) {
-                // FIX: Use MEDICINE_ID
-                $sql = 'DELETE FROM Medicine WHERE MEDICINE_ID = ?';
-                sqlsrv_query($conn, $sql, [$id_to_delete]);
+            if ($mysql_conn) {
+                $stmt = $mysql_conn->prepare("DELETE FROM Medicine WHERE MEDICINE_ID = ?");
+                $stmt->bind_param("i", $id_to_delete);
+                $stmt->execute();
             }
-        } catch (Exception $e) {
-            // Error handling placeholder
-        }
+            if ($mysql_conn2) {
+                $stmt = $mysql_conn2->prepare("DELETE FROM Medicine WHERE MEDICINE_ID = ?");
+                $stmt->bind_param("i", $id_to_delete);
+                $stmt->execute();
+            } 
+            if ($pg_conn) {
+                $stmt = $pg_conn->prepare("DELETE FROM MEDICINE WHERE MEDICINE_ID = :id");
+                $stmt->execute([':id' => $id_to_delete]);
+            } 
+            if ($pdo) {
+                $stmt = $pdo->prepare("DELETE FROM Medicine WHERE MEDICINE_ID = :id");
+                $stmt->execute([':id' => $id_to_delete]);
+            }
+        } catch (Exception $e) { /* Ignore */ }
     }
-    // Redirect to prevent form resubmission and clear the POST state
     header('Location: medDirectory.php');
     exit;
 }
 
-// Get input from query parameters for search/filter
+// Get input
 $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
 $filter_type = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 
-// --- 2. Fetch All Medicines from DB ---
+// --- 2. Fetch Medicines from ALL Sources ---
 $all_meds = [];
-$connection_error_message = ''; // Variable for error reporting
-
-// Inject default minStock value (50) as the DB table likely doesn't have this column
-$min_stock_defaults = [ 
-    'default' => 50 
-];
+$min_stock_defaults = ['default' => 50];
 
 try {
-    // FIX: Use MEDICINE_ID in the SELECT statement
     $sql = "SELECT MEDICINE_ID, NAME, CATEGORY_TYPE, QUANTITY_IN_STOCK, EXPIRY_DATE, SUPPLIER_NAME, UNIT_PRICE, STOCK_PRICE FROM Medicine";
     
-    if (isset($pdo) && $pdo !== null) {
-        // PDO fetch logic
+    // 1. Fetch from MySQL #1
+    if ($mysql_conn) {
+        $result = $mysql_conn->query($sql);
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $r = array_change_key_case($row, CASE_UPPER);
+                if (!empty($r['EXPIRY_DATE'])) $r['EXPIRY_DATE'] = date('Y-m-d', strtotime($r['EXPIRY_DATE']));
+                $id_key = $r['MEDICINE_ID'] ?? null;
+                $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
+                // Optional: Tag source if needed for debugging
+                // $r['SOURCE'] = 'MySQL 1'; 
+                $all_meds[] = $r;
+            }
+        }
+    }
+
+    // 2. Fetch from MySQL #2
+    if ($mysql_conn2) {
+        $result = $mysql_conn2->query($sql);
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $r = array_change_key_case($row, CASE_UPPER);
+                if (!empty($r['EXPIRY_DATE'])) $r['EXPIRY_DATE'] = date('Y-m-d', strtotime($r['EXPIRY_DATE']));
+                $id_key = $r['MEDICINE_ID'] ?? null;
+                $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
+                $all_meds[] = $r;
+            }
+        }
+    }
+
+    // 3. Fetch from PostgreSQL
+    if ($pg_conn) {
+        $stmt = $pg_conn->query($sql);
+        if ($stmt) {
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $r = array_change_key_case($row, CASE_UPPER);
+                if (!empty($r['EXPIRY_DATE'])) $r['EXPIRY_DATE'] = date('Y-m-d', strtotime($r['EXPIRY_DATE']));
+                $id_key = $r['MEDICINE_ID'] ?? null;
+                $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
+                $all_meds[] = $r;
+            }
+        }
+    }
+
+    // 4. Fetch from SQL Server
+    if ($pdo) {
         $stmt = $pdo->query($sql);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as $r) {
             if (!empty($r['EXPIRY_DATE'])) {
                 $d = $r['EXPIRY_DATE'];
-                if ($d instanceof DateTime) $r['EXPIRY_DATE'] = $d->format('Y-m-d');
-                else $r['EXPIRY_DATE'] = date('Y-m-d', strtotime($r['EXPIRY_DATE']));
+                $r['EXPIRY_DATE'] = ($d instanceof DateTime) ? $d->format('Y-m-d') : date('Y-m-d', strtotime($r['EXPIRY_DATE']));
             }
             $id_key = $r['MEDICINE_ID'] ?? null;
             $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
             $all_meds[] = $r;
         }
-    } elseif (isset($conn) && $conn !== null) {
-        // SQLSRV fetch logic with explicit error checking
+    } elseif ($conn) {
+        // Legacy sqlsrv fallback
         $stmt = sqlsrv_query($conn, $sql);
-        if ($stmt === false) {
-            $sqlsrv_errors = sqlsrv_errors(SQLSRV_ERR_ERRORS);
-            $error_msg = 'SQL Query Failed.';
-            if ($sqlsrv_errors) {
-                // Display the specific SQL Server error
-                $error_msg .= ' Details: ' . print_r($sqlsrv_errors, true);
-            }
-            $connection_error_message = '❌ DATABASE QUERY FAILED: ' . $error_msg;
-        } else {
-            while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-                if (!empty($r['EXPIRY_DATE']) && $r['EXPIRY_DATE'] instanceof DateTime) {
+        if ($stmt) {
+            while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+                $r = $row; // SQLSRV returns correct case usually
+                 if (!empty($r['EXPIRY_DATE']) && $r['EXPIRY_DATE'] instanceof DateTime) {
                     $r['EXPIRY_DATE'] = $r['EXPIRY_DATE']->format('Y-m-d');
                 }
                 $id_key = $r['MEDICINE_ID'] ?? null;
                 $r['minStock'] = $min_stock_defaults[(string)$id_key] ?? $min_stock_defaults['default'];
                 $all_meds[] = $r;
             }
-            sqlsrv_free_stmt($stmt);
         }
-    } else {
-        $connection_error_message = '⚠️ DATABASE CONNECTION FAILED. Check credentials in connection.php.';
     }
-} catch (Exception $e) {
-    $all_meds = [];
-    $connection_error_message = '❌ PHP EXCEPTION: ' . htmlspecialchars($e->getMessage());
-}
 
-// --- 3. Calculate Stats from all_meds (for dashboard) ---
+} catch (Exception $e) { /* Error handling */ }
+
+// --- 3. Calculate Stats ---
+$totalMedicines = count($all_meds);
+$lowStockCount = 0; $expiringCount = 0; $expiredCount = 0;
 $now_ts = time();
 $expiring_limit_ts = strtotime("+{$DAYS_EXPIRING_SOON} days");
-$totalMedicines = count($all_meds);
-$lowStockCount = 0;
-$expiringCount = 0;
-$expiredCount = 0;
 
 foreach ($all_meds as $m) {
     $stock = (int)($m['QUANTITY_IN_STOCK'] ?? 0);
     $minStock = (int)($m['minStock'] ?? 0);
     $expiry = !empty($m['EXPIRY_DATE']) ? strtotime($m['EXPIRY_DATE']) : null;
     
-    if ($stock <= $minStock) {
-        $lowStockCount++;
-    }
-
+    if ($stock <= $minStock) $lowStockCount++;
     if ($expiry) {
-        if ($expiry < $now_ts) {
-            $expiredCount++;
-        } elseif ($expiry > $now_ts && $expiry <= $expiring_limit_ts) {
-            $expiringCount++;
-        }
+        if ($expiry < $now_ts) $expiredCount++;
+        elseif ($expiry > $now_ts && $expiry <= $expiring_limit_ts) $expiringCount++;
     }
 }
 
-// --- 4. Apply Filter and Search to get the list to display ---
+// --- 4. Filter Logic ---
 $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $filter_type, $now_ts, $expiring_limit_ts) {
-    // Search filter
     if ($search_query !== '') {
         $q = strtolower($search_query);
-        // FIX: Use all-caps column names for search
         $name = strtolower($m['NAME'] ?? '');
         $id = strtolower($m['MEDICINE_ID'] ?? '');
         $category = strtolower($m['CATEGORY_TYPE'] ?? '');
-        if (strpos($name, $q) === false && strpos($id, $q) === false && strpos($category, $q) === false) {
-            return false;
-        }
+        if (strpos($name, $q) === false && strpos($id, $q) === false && strpos($category, $q) === false) return false;
     }
-
-    // Category filter
     $stock = (int)($m['QUANTITY_IN_STOCK'] ?? 0);
     $minStock = (int)($m['minStock'] ?? 0);
     $expiry = !empty($m['EXPIRY_DATE']) ? strtotime($m['EXPIRY_DATE']) : null;
 
     switch ($filter_type) {
-        case 'low-stock':
-            return $stock <= $minStock;
-        case 'expiring':
-            return $expiry && $expiry > $now_ts && $expiry <= $expiring_limit_ts;
-        case 'expired':
-            return $expiry && $expiry < $now_ts;
-        case 'all':
-        default:
-            return true;
+        case 'low-stock': return $stock <= $minStock;
+        case 'expiring': return $expiry && $expiry > $now_ts && $expiry <= $expiring_limit_ts;
+        case 'expired': return $expiry && $expiry < $now_ts;
+        case 'all': default: return true;
     }
 });
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -154,6 +183,51 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medicine Inventory Management</title>
     <style>
+        /* ADDED CSS for Top Navigation */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 30px;
+            background: #1976d2; /* Darker blue */
+            color: white;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            margin-left: 15px;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+
+        .user-info {
+            font-size: 0.9em;
+        }
+
+        .btn-logout {
+            padding: 6px 12px;
+            border: 1px solid white;
+            border-radius: 6px;
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Existing CSS continues below */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); overflow: hidden; }
@@ -212,9 +286,25 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
         .empty-state-icon { font-size: 4em; margin-bottom: 20px; }
         .empty-state h3 { font-size: 1.5em; margin-bottom: 10px; color: #666; }
         .error-message { background: #ffdddd; color: #cc0000; padding: 15px; border: 1px solid #cc0000; margin: 20px; border-radius: 8px; font-weight: bold; }
+
+        /* DB Status Bar */
+        .status-bar { display: flex; justify-content: space-around; background: #333; color: white; padding: 10px; font-size: 0.9em; margin-bottom: 20px; border-radius: 8px;}
+        .status-item span { font-weight: bold; margin-left: 5px; }
     </style>
 </head>
 <body>
+    <header class="top-nav">
+        <div class="user-info">
+            Welcome, **<?php echo htmlspecialchars($username); ?>** (<?php echo htmlspecialchars($userRole); ?>)
+        </div>
+        <div class="nav-links">
+            <a href="dashboard.php">🏠 Dashboard</a>
+            <a href="stock.php">⚠️ Stock Alerts</a>
+            <a href="expiry.php">🔴 Expiry Alerts</a>
+            <a href="logout.php" class="btn-logout">Log Out</a>
+        </div>
+    </header>
+    
     <div class="container">
         <header class="header">
             <div class="header-content">
@@ -222,6 +312,13 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
                 <p class="subtitle">Monitor stock levels and expiry dates</p>
             </div>
         </header>
+
+        <div class="status-bar">
+            <div class="status-item">MySQL 1: <span><?php echo $status_mysql1; ?></span></div>
+            <div class="status-item">MySQL 2: <span><?php echo $status_mysql2; ?></span></div>
+            <div class="status-item">Postgres: <span><?php echo $status_pg; ?></span></div>
+            <div class="status-item">SQL Server: <span><?php echo $status_sql; ?></span></div>
+        </div>
         
         <?php if (!empty($connection_error_message)): ?>
             <div class="error-message"><?php echo $connection_error_message; ?></div>
@@ -288,7 +385,6 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
             <div class="medicines-list" id="medicinesList">
                 <?php if (!empty($meds_to_display)): ?>
                     <?php foreach ($meds_to_display as $m):
-                        // FIXES APPLIED HERE: Using all-caps column names for display
                         $id = htmlspecialchars($m['MEDICINE_ID'] ?? '');
                         $name = htmlspecialchars($m['NAME'] ?? '');
                         $category = htmlspecialchars($m['CATEGORY_TYPE'] ?? '');
