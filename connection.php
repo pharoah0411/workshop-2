@@ -14,24 +14,6 @@ $pdo = null;
 $conn = null; 
 
 // ==================================================================================
-// 1. MySQL Connection #1 (Primary) - 10.245.156.96
-// ==================================================================================
-$mysql_servername = "10.245.156.96";
-$mysql_username = "FARAH";
-$mysql_password = "1234"; 
-$mysql_dbname = "pharmacy_db";
-$mysql_port = 3306; 
-
-$temp_mysql = @new mysqli($mysql_servername, $mysql_username, $mysql_password, $mysql_dbname, $mysql_port);
-
-if ($temp_mysql->connect_error) {
-    // Log error but don't stop script
-    $mysql_error = "MySQL #1 Failed: " . $temp_mysql->connect_error;
-} else {
-    $mysql_conn = $temp_mysql;
-}
-
-// ==================================================================================
 // 2. MySQL Connection #2 (Secondary)
 // ==================================================================================
 // !!! PLEASE UPDATE THESE CREDENTIALS FOR YOUR SECOND DATABASE !!!
@@ -66,22 +48,33 @@ try {
 }
 
 // ==================================================================================
-// 4. SQL Server Connection - PHAROAHS
+// 4. SQL Server Connection - IP Address
 // ==================================================================================
-$serverName = "PHAROAHS"; 
+// Replace with your specific IP and Port (Default SQL Server port is 1433)
+$serverIp = "10.245.156.110"; // Example IP
+$serverPort = "1433";        // Example Port
+$serverName = "$serverIp, $serverPort"; // Format: "IP, PORT"
+
 $database = "Workshop";
-$uid = ""; 
-$pass = ""; 
+$uid = "myuser";       // Your Database Username
+$pass = "StrongPass123!"; // Your Database Password
 
 try {
     // Try PDO first
+    // Note: 'tcp:' forces a TCP/IP connection
     $dsn = "sqlsrv:Server={$serverName};Database={$database}";
     $pdo = new PDO($dsn, $uid, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    
 } catch (PDOException $e) {
     // If PDO fails, try legacy sqlsrv
     if (function_exists('sqlsrv_connect')) {
         $connectionInfo = ["Database" => $database, "UID" => $uid, "PWD" => $pass];
         $conn = @sqlsrv_connect($serverName, $connectionInfo);
+        
+        if ($conn === false) {
+             // Optional: Uncomment to debug connection errors
+             // die(print_r(sqlsrv_errors(), true));
+        }
     }
 }
 ?>
