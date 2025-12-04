@@ -56,8 +56,8 @@ $serverPort = "1433";        // Example Port
 $serverName = "$serverIp, $serverPort"; // Format: "IP, PORT"
 
 $database = "Workshop";
-$uid = "farah";       // Your Database Username
-$pass = "12345"; // Your Database Password
+$uid = "myuser";       // Your Database Username
+$pass = "StrongPass123!"; // Your Database Password
 
 try {
     // Try PDO first
