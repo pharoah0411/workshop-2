@@ -49,6 +49,8 @@ $pg_password = "12345";
 try {
     $dsn = "pgsql:host=$pg_host;port=$pg_port;dbname=$pg_dbname";
     $pg_conn = new PDO($dsn, $pg_user, $pg_password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $conn = $pg_conn;
+
 
 } catch (Exception $e) {
     // Connection failed: Set variable to null
