@@ -3,7 +3,7 @@ include "connection.php";
 include "header.php";
 
 // Fetch only admin + pharmacist
-$query = $conn->query("SELECT * FROM \"user\" WHERE role IN ('admin', 'pharmacist') ORDER BY user_id ASC");
+$query = $pg_conn->query("SELECT * FROM \"user\" WHERE role IN ('admin', 'pharmacist') ORDER BY user_id ASC");
 $users = $query->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
