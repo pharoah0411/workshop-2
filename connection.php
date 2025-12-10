@@ -34,7 +34,7 @@ try {
 } catch (Exception $e) {
     // Connection failed: Set variable to null so the app knows it's offline
     $mysql_conn2 = null;
-    $mysql2_error = "MySQL #2 Failed: " . $e->getMessage();
+    $mysql2_error = "MySQL Failed: " . $e->getMessage();
 }
 
 // ==================================================================================
@@ -64,12 +64,12 @@ $serverPort = "1433";
 $serverName = "$serverIp, $serverPort"; // Note: SQL Server uses a comma for ports
 
 $database = "Workshop";
-$uid = "myuser";          // UPDATE THIS if 'myuser' is not correct
-$pass = "StrongPass123!"; // UPDATE THIS if 'StrongPass123!' is not correct
+$uid = "myuser";         
+$pass = "StrongPass123!"; 
 
 try {
     // Try PDO first (Recommended)
-    $dsn = "sqlsrv:Server={$serverName};Database={$database}";
+    $dsn = "sqlsrv:Server={$serverName};Database={$database};TrustServerCertificate=true;Encrypt=false";
     $pdo = new PDO($dsn, $uid, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     
 } catch (Exception $e) {
