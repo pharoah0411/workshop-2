@@ -1,5 +1,5 @@
 <div class="sidebar">
-    <h2>Pharmacy System</h2>
+    <h2>USER & MANAGEMENT</h2>
 
     <a href="dashboard.php">Dashboard</a>
 
