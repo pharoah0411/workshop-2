@@ -23,7 +23,7 @@ JOIN \"user\" u ON p.user_id = u.user_id
 ORDER BY p.patient_id ASC
 ";
 
-$stmt = $conn->query($sql);
+$stmt = $pg_conn->query($sql);
 $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
