@@ -22,14 +22,19 @@ $mysql2_password = "Syimazmi201.";
 $mysql2_dbname = "medicine prescription";
 $mysql2_port = 3306; 
 
-// Suppress error with @, check manually below
-$temp_mysql2 = @new mysqli($mysql2_servername, $mysql2_username, $mysql2_password, $mysql2_dbname, $mysql2_port);
+try {
+    // Attempt to connect. If it fails (timeout/offline), it jumps to 'catch'
+    $mysql_conn2 = new mysqli($mysql2_servername, $mysql2_username, $mysql2_password, $mysql2_dbname, $mysql2_port);
 
-if ($temp_mysql2->connect_error) {
-    // You can log this error or display it if needed
-    $mysql2_error = "MySQL #2 Failed: " . $temp_mysql2->connect_error;
-} else {
-    $mysql_conn2 = $temp_mysql2;
+    // Check for logical connection errors even if no exception was thrown
+    if ($mysql_conn2->connect_error) {
+        throw new Exception($mysql_conn2->connect_error);
+    }
+
+} catch (Exception $e) {
+    // Connection failed: Set variable to null so the app knows it's offline
+    $mysql_conn2 = null;
+    $mysql2_error = "MySQL #2 Failed: " . $e->getMessage();
 }
 
 // ==================================================================================
@@ -44,7 +49,10 @@ $pg_password = "12345";
 try {
     $dsn = "pgsql:host=$pg_host;port=$pg_port;dbname=$pg_dbname";
     $pg_conn = new PDO($dsn, $pg_user, $pg_password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-} catch (PDOException $e) {
+
+} catch (Exception $e) {
+    // Connection failed: Set variable to null
+    $pg_conn = null;
     $pg_error = "PostgreSQL Failed: " . $e->getMessage();
 }
 
@@ -64,15 +72,18 @@ try {
     $dsn = "sqlsrv:Server={$serverName};Database={$database}";
     $pdo = new PDO($dsn, $uid, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     
-} catch (PDOException $e) {
-    // If PDO fails, try legacy sqlsrv driver
+} catch (Exception $e) {
+    // If PDO fails, try legacy sqlsrv driver inside this catch block
+    $pdo = null; // Ensure PDO is null
+    
     if (function_exists('sqlsrv_connect')) {
+        // Use @ to suppress warnings for the legacy driver, as it doesn't always throw Exceptions
         $connectionInfo = ["Database" => $database, "UID" => $uid, "PWD" => $pass];
         $conn = @sqlsrv_connect($serverName, $connectionInfo);
         
         if ($conn === false) {
-             // Optional error handling
-             // echo "SQL Server Legacy Connection Failed.<br>";
+             $conn = null; // Ensure legacy conn is null if failed
+             // Optional: log error using sqlsrv_errors()
         }
     }
 }
