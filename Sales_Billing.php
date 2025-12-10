@@ -1,14 +1,9 @@
 <?php
-// sales_billing.php - This file must be executed by the PHP interpreter (i.e., accessed via http://localhost/...)
-
-header('Content-Type: text/html; charset=utf-8'); // Add this line
+// sales_billing.php
+header('Content-Type: text/html; charset=utf-8');
 require_once "connection.php";
 
-// ... rest of your PHP code
-?>
-
-require_once "connection.php";
-
+// Check PostgreSQL connection
 if (!$pg_conn) {
     die("❌ PostgreSQL Connection Failed");
 }
@@ -42,26 +37,38 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 // ===================== B. SALES DASHBOARD DATA FETCH =====================
 
 // Today Sales
-$today_sales_stmt = $pg_conn->query("
-    SELECT COALESCE(SUM(total_amount),0) AS total 
-    FROM sales 
-    WHERE DATE(sale_date) = CURRENT_DATE
-");
-$today = $today_sales_stmt->fetch(PDO::FETCH_ASSOC);
+try {
+    $today_sales_stmt = $pg_conn->query("
+        SELECT COALESCE(SUM(total_amount),0) AS total 
+        FROM sales 
+        WHERE DATE(sale_date) = CURRENT_DATE
+    ");
+    $today = $today_sales_stmt->fetch(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $today = ['total' => 0];
+}
 
 // Month Sales
-$month_sales_stmt = $pg_conn->query("
-    SELECT COALESCE(SUM(total_amount),0) AS total 
-    FROM sales 
-    WHERE DATE_TRUNC('month', sale_date) = DATE_TRUNC('month', CURRENT_DATE)
-");
-$month = $month_sales_stmt->fetch(PDO::FETCH_ASSOC);
+try {
+    $month_sales_stmt = $pg_conn->query("
+        SELECT COALESCE(SUM(total_amount),0) AS total 
+        FROM sales 
+        WHERE DATE_TRUNC('month', sale_date) = DATE_TRUNC('month', CURRENT_DATE)
+    ");
+    $month = $month_sales_stmt->fetch(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $month = ['total' => 0];
+}
 
 // Recent 10 Sales
-$recent_sales_stmt = $pg_conn->query("
-    SELECT * FROM sales ORDER BY sale_date DESC LIMIT 10
-");
-$recent = $recent_sales_stmt->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $recent_sales_stmt = $pg_conn->query("
+        SELECT * FROM sales ORDER BY sale_date DESC LIMIT 10
+    ");
+    $recent = $recent_sales_stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $recent = [];
+}
 
 
 // ===================== C. ALL PAYMENTS DATA FETCH =====================
@@ -72,7 +79,6 @@ try {
     error_log("Error fetching payments: " . $e->getMessage());
     $payments = []; 
 }
-
 ?>
 <!DOCTYPE html>
 <html>
@@ -130,7 +136,7 @@ try {
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <a href="new_sale.php" class="btn btn-primary btn-lg w-100 shadow-sm" style="height: 100%;">+ New Sale / Transaction</a>
+                    <a href="new_sale.php" class="btn btn-primary btn-lg w-100 shadow-sm" style="display: flex; align-items: center; justify-content: center;">+ New Sale / Transaction</a>
                 </div>
             </div>
 
@@ -147,15 +153,19 @@ try {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($recent as $row) { ?>
-                            <tr>
-                                <td><?= $row['sale_id'] ?></td>
-                                <td><?= $row['patient_name'] ?></td>
-                                <td>RM <?= number_format($row['total_amount'], 2) ?></td>
-                                <td><?= $row['sale_date'] ?></td>
-                                <td><a href="sales_receipt.php?sale_id=<?= $row['sale_id'] ?>" class="btn btn-success btn-sm">View</a></td>
-                            </tr>
-                        <?php } ?>
+                        <?php if (empty($recent)): ?>
+                            <tr><td colspan="5" class="text-center">No recent sales found.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($recent as $row) { ?>
+                                <tr>
+                                    <td><?= $row['sale_id'] ?></td>
+                                    <td><?= htmlspecialchars($row['patient_name']) ?></td>
+                                    <td>RM <?= number_format($row['total_amount'], 2) ?></td>
+                                    <td><?= $row['sale_date'] ?></td>
+                                    <td><a href="sales_receipt.php?sale_id=<?= $row['sale_id'] ?>" class="btn btn-success btn-sm">View</a></td>
+                                </tr>
+                            <?php } ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -166,8 +176,9 @@ try {
             <div class="card shadow p-4 mb-4">
                 <h3 class="text-center text-primary">💵 Submit New Payment</h3>
 
-                <form method="POST" action="sales_billing.php" class="mt-4">
-                    <input type="hidden" name="form_type" value="payment_insert"> <div class="row">
+                <form method="POST" action="Sales_Billing.php" class="mt-4">
+                    <input type="hidden" name="form_type" value="payment_insert"> 
+                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Prescription ID</label>
                             <input type="number" name="prescription_id" class="form-control" required min="1">
@@ -197,18 +208,22 @@ try {
                     </thead>
 
                     <tbody>
-                        <?php foreach ($payments as $row) { ?>
-                        <tr>
-                            <td><?= $row['payment_id'] ?></td>
-                            <td><?= $row['prescription_id'] ?></td>
-                            <td>RM <?= number_format($row['total_amount'], 2) ?></td>
-                            <td><?= $row['payment_date'] ?></td>
-                            <td>
-                                <a href="invoice.php?payment_id=<?= $row['payment_id'] ?>" 
-                                   class="btn btn-success btn-sm">Generate Invoice</a>
-                            </td>
-                        </tr>
-                        <?php } ?>
+                        <?php if (empty($payments)): ?>
+                            <tr><td colspan="5" class="text-center">No payment records found.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($payments as $row) { ?>
+                            <tr>
+                                <td><?= $row['payment_id'] ?></td>
+                                <td><?= $row['prescription_id'] ?></td>
+                                <td>RM <?= number_format($row['total_amount'], 2) ?></td>
+                                <td><?= $row['payment_date'] ?></td>
+                                <td>
+                                    <a href="invoice.php?payment_id=<?= $row['payment_id'] ?>" 
+                                       class="btn btn-success btn-sm">Generate Invoice</a>
+                                </td>
+                            </tr>
+                            <?php } ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>

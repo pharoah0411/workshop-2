@@ -93,7 +93,7 @@ try {
     // 2. PostgreSQL
     if (isset($pg_conn) && $pg_conn instanceof PDO) {
         // Postgres uses double quotes for reserved words
-        $p_sql = str_replace(['[USER]', '1=1'], ['"USER"', '1=1'], $sql);
+        $p_sql = str_replace(['[USER]', '1=1'], ['"user"', '1=1'], $sql);
         $stmt = $pg_conn->query($p_sql);
         if ($stmt) {
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
