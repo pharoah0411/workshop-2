@@ -1,238 +1,335 @@
 <?php
 // sales_billing.php
+// --- PHP BACKEND LOGIC ---
+
 header('Content-Type: text/html; charset=utf-8');
-require_once "connection.php";
+// Assuming 'connection.php' contains PDO connection setup ($pg_conn)
+require_once "connection.php"; 
 
 // Check PostgreSQL connection
-if (!$pg_conn) {
-    die("❌ PostgreSQL Connection Failed");
-}
+if (!isset($pg_conn) || !$pg_conn) {
+    // If the connection failed, set a message and set dummy data to prevent fatal errors
+    $message = "❌ Database Connection Failed. Please check connection.php.";
+    $today = ['total' => 0];
+    $month = ['total' => 0];
+    $recent = [];
+    $payments = [];
+} else {
+    $message = "";
 
-$message = "";
+    // ===================== A. PAYMENT INSERT LOGIC =====================
+    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] == 'payment_insert') {
+        // Sanitize and validate inputs
+        $prescription_id = filter_input(INPUT_POST, 'prescription_id', FILTER_VALIDATE_INT);
+        $total_amount = filter_input(INPUT_POST, 'total_amount', FILTER_VALIDATE_FLOAT);
 
-// ===================== A. PAYMENT INSERT LOGIC =====================
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] == 'payment_insert') {
-    $prescription_id = filter_input(INPUT_POST, 'prescription_id', FILTER_VALIDATE_INT);
-    $total_amount = filter_input(INPUT_POST, 'total_amount', FILTER_VALIDATE_FLOAT);
-
-    if ($prescription_id === false || $total_amount === false || $prescription_id <= 0 || $total_amount <= 0) {
-        $message = "Error: Invalid Prescription ID or Total Amount.";
-    } else {
-        try {
-            $stmt = $pg_conn->prepare("
-                INSERT INTO public.payment (prescription_id, payment_date, total_amount)
-                VALUES (:prescription_id, NOW(), :total_amount)
-            ");
-            $stmt->execute([
-                ":prescription_id" => $prescription_id,
-                ":total_amount" => $total_amount
-            ]);
-            $message = "Payment added successfully!";
-        } catch (PDOException $e) {
-            $message = "Error adding payment: " . $e->getMessage();
+        if ($prescription_id === false || $total_amount === false || $prescription_id <= 0 || $total_amount <= 0) {
+            $message = "Error: Invalid Prescription ID or Total Amount. Must be positive numbers.";
+        } else {
+            try {
+                // Use prepared statements to prevent SQL injection
+                $stmt = $pg_conn->prepare("
+                    INSERT INTO public.payment (prescription_id, payment_date, total_amount)
+                    VALUES (:prescription_id, NOW(), :total_amount)
+                ");
+                $stmt->execute([
+                    ":prescription_id" => $prescription_id,
+                    ":total_amount" => $total_amount
+                ]);
+                $message = "✅ Payment added successfully! Prescription ID: " . $prescription_id;
+            } catch (PDOException $e) {
+                // Log the actual error but show a user-friendly message
+                error_log("Error adding payment: " . $e->getMessage());
+                $message = "Error adding payment. Please check database configuration.";
+            }
         }
     }
-}
 
-// ===================== B. SALES DASHBOARD DATA FETCH =====================
+    // ===================== B. SALES DASHBOARD DATA FETCH =====================
 
-// Today Sales
-try {
-    $today_sales_stmt = $pg_conn->query("
-        SELECT COALESCE(SUM(total_amount),0) AS total 
-        FROM sales 
-        WHERE DATE(sale_date) = CURRENT_DATE
-    ");
-    $today = $today_sales_stmt->fetch(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $today = ['total' => 0];
-}
+    // 1. Today's Sales
+    try {
+        $today_sales_stmt = $pg_conn->query("
+            SELECT COALESCE(SUM(total_amount),0) AS total 
+            FROM sales 
+            WHERE DATE(sale_date) = CURRENT_DATE
+        ");
+        $today = $today_sales_stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $today = ['total' => 0];
+        error_log("Error fetching today's sales: " . $e->getMessage());
+    }
 
-// Month Sales
-try {
-    $month_sales_stmt = $pg_conn->query("
-        SELECT COALESCE(SUM(total_amount),0) AS total 
-        FROM sales 
-        WHERE DATE_TRUNC('month', sale_date) = DATE_TRUNC('month', CURRENT_DATE)
-    ");
-    $month = $month_sales_stmt->fetch(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $month = ['total' => 0];
-}
+    // 2. This Month's Sales
+    try {
+        $month_sales_stmt = $pg_conn->query("
+            SELECT COALESCE(SUM(total_amount),0) AS total 
+            FROM sales 
+            WHERE DATE_TRUNC('month', sale_date) = DATE_TRUNC('month', CURRENT_DATE)
+        ");
+        $month = $month_sales_stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $month = ['total' => 0];
+        error_log("Error fetching month's sales: " . $e->getMessage());
+    }
 
-// Recent 10 Sales
-try {
-    $recent_sales_stmt = $pg_conn->query("
-        SELECT * FROM sales ORDER BY sale_date DESC LIMIT 10
-    ");
-    $recent = $recent_sales_stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $recent = [];
-}
+    // 3. Recent 10 Sales
+    try {
+        // NOTE: patient_name is assumed to be a column in the 'sales' table for display purposes
+        $recent_sales_stmt = $pg_conn->query("
+            SELECT sale_id, patient_name, total_amount, sale_date 
+            FROM sales 
+            ORDER BY sale_date DESC 
+            LIMIT 10
+        ");
+        $recent = $recent_sales_stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $recent = [];
+        error_log("Error fetching recent sales: " . $e->getMessage());
+    }
 
 
-// ===================== C. ALL PAYMENTS DATA FETCH =====================
-try {
-    $result_payments = $pg_conn->query("SELECT * FROM public.payment ORDER BY payment_id DESC");
-    $payments = $result_payments->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    error_log("Error fetching payments: " . $e->getMessage());
-    $payments = []; 
+    // ===================== C. ALL PAYMENTS DATA FETCH =====================
+    try {
+        $result_payments = $pg_conn->query("
+            SELECT payment_id, prescription_id, total_amount, payment_date 
+            FROM public.payment 
+            ORDER BY payment_id DESC
+        ");
+        $payments = $result_payments->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error fetching payments: " . $e->getMessage());
+        $payments = []; 
+    }
 }
 ?>
+
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Sales and Billing</title>
+    <meta charset="UTF-8"> 
+    <title>Sales and Billing Control Panel</title>
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
     <style>
-        body { background-color: #87d2f0; }
-        .card { border-radius: 12px; border: none; }
-        .nav-link.active { background-color: #0066cc !important; color: white !important; }
-        .nav-link { color: #0066cc; }
+        /* 1. BODY: Match the solid blue background of the Prescription Dashboard */
+        body { 
+            background-color: #0066ff; 
+            min-height: 100vh;
+        } 
+        
+        /* 2. CONTAINER: White background for the main content area with rounded corners and shadow */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px; 
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            padding-bottom: 20px; 
+            /* Push the container down from the top edge */
+            margin-top: 50px !important; 
+            margin-bottom: 50px !important; 
+        }
+        
+        /* 3. HEADER BOX: The "Pop Out" Header Style */
+        .header-box {
+            /* Use a gradient similar to the main dashboard/prescription page banner */
+            background: linear-gradient(to right, #0056b3, #0099ff);
+            color: white; 
+            padding: 25px 30px; 
+            /* This margin creates the "pop out" effect against the white container */
+            margin: 20px; 
+            margin-bottom: 0; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25); 
+            position: relative; 
+            top: -10px; /* Slight lift */
+        }
+        
+        /* Ensure the H2 text inside the box is styled correctly */
+        .header-box h2 {
+            color: white !important;
+            font-weight: 700; 
+            font-size: 2.0rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            margin: 0;
+            text-align: center; 
+        }
+
+        /* 4. Tab and Card Styles - Updated for white container background */
+        .card { 
+            border-radius: 12px; 
+            border: none; 
+        }
+        .nav-link.active { 
+            /* Use the primary blue color for the active tab */
+            background-color: #007bff !important; 
+            color: white !important; 
+        }
+        .nav-link { 
+            /* Use the primary blue color for inactive tabs' text */
+            color: #007bff; 
+        }
+        .btn-primary {
+            /* Ensure primary buttons use the matching blue theme */
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+        
     </style>
 </head>
 
 <body>
 
-<div class="container mt-5">
+<div class="container">
 
-    <h2 class="text-dark mb-4">📊 Sales and Billing Control Panel</h2>
-
-    <?php if (!empty($message)) { ?>
-        <div class="alert alert-info text-center">
-            <?= $message ?>
-        </div>
-    <?php } ?>
-
-    <ul class="nav nav-tabs mb-4" id="salesBillingTab" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab" aria-controls="dashboard" aria-selected="true">
-                Sales Dashboard
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="payment-tab" data-bs-toggle="tab" data-bs-target="#payment" type="button" role="tab" aria-controls="payment" aria-selected="false">
-                Payment & Billing
-            </button>
-        </li>
-    </ul>
-
-    <div class="tab-content" id="salesBillingTabContent">
-
-        <div class="tab-pane fade show active" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
-
-            <div class="row mb-4">
-                <div class="col-md-4">
-                    <div class="card p-3 shadow-sm">
-                        <h5>📅 Today's Sales</h5>
-                        <h3>RM <?= number_format($today['total'], 2) ?></h3>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card p-3 shadow-sm">
-                        <h5>🗓 This Month's Sales</h5>
-                        <h3>RM <?= number_format($month['total'], 2) ?></h3>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <a href="new_sale.php" class="btn btn-primary btn-lg w-100 shadow-sm" style="display: flex; align-items: center; justify-content: center;">+ New Sale / Transaction</a>
-                </div>
-            </div>
-
-            <div class="card shadow p-4 mt-4">
-                <h4>Recent Sales Transactions</h4>
-                <table class="table table-bordered table-hover">
-                    <thead>
-                        <tr>
-                            <th>Sale ID</th>
-                            <th>Patient</th>
-                            <th>Total</th>
-                            <th>Date</th>
-                            <th>Receipt</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($recent)): ?>
-                            <tr><td colspan="5" class="text-center">No recent sales found.</td></tr>
-                        <?php else: ?>
-                            <?php foreach ($recent as $row) { ?>
-                                <tr>
-                                    <td><?= $row['sale_id'] ?></td>
-                                    <td><?= htmlspecialchars($row['patient_name']) ?></td>
-                                    <td>RM <?= number_format($row['total_amount'], 2) ?></td>
-                                    <td><?= $row['sale_date'] ?></td>
-                                    <td><a href="sales_receipt.php?sale_id=<?= $row['sale_id'] ?>" class="btn btn-success btn-sm">View</a></td>
-                                </tr>
-                            <?php } ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="tab-pane fade" id="payment" role="tabpanel" aria-labelledby="payment-tab">
-            
-            <div class="card shadow p-4 mb-4">
-                <h3 class="text-center text-primary">💵 Submit New Payment</h3>
-
-                <form method="POST" action="Sales_Billing.php" class="mt-4">
-                    <input type="hidden" name="form_type" value="payment_insert"> 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Prescription ID</label>
-                            <input type="number" name="prescription_id" class="form-control" required min="1">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Total Amount (RM)</label>
-                            <input type="number" step="0.01" name="total_amount" class="form-control" required>
-                        </div>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary w-100 mt-2">Submit Payment</button>
-                </form>
-            </div>
-
-            <div class="card shadow p-4">
-                <h3 class="text-center text-primary mb-4">Payment Records</h3>
-
-                <table class="table table-bordered table-hover">
-                    <thead>
-                        <tr>
-                            <th>Payment ID</th>
-                            <th>Prescription ID</th>
-                            <th>Total Amount</th>
-                            <th>Date</th>
-                            <th>Invoice</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        <?php if (empty($payments)): ?>
-                            <tr><td colspan="5" class="text-center">No payment records found.</td></tr>
-                        <?php else: ?>
-                            <?php foreach ($payments as $row) { ?>
-                            <tr>
-                                <td><?= $row['payment_id'] ?></td>
-                                <td><?= $row['prescription_id'] ?></td>
-                                <td>RM <?= number_format($row['total_amount'], 2) ?></td>
-                                <td><?= $row['payment_date'] ?></td>
-                                <td>
-                                    <a href="invoice.php?payment_id=<?= $row['payment_id'] ?>" 
-                                       class="btn btn-success btn-sm">Generate Invoice</a>
-                                </td>
-                            </tr>
-                            <?php } ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-
-        </div>
-
+    <div class="header-box">
+        <h2 style="margin: 0;">📊 Sales and Billing Control Panel</h2>
     </div>
 
-</div>
+    <div style="padding: 0 20px 20px 20px;">
+        
+        <?php if (!empty($message)) { ?>
+            <div class="alert alert-info text-center">
+                <?= $message ?>
+            </div>
+        <?php } ?>
+
+        <ul class="nav nav-tabs mb-4" id="salesBillingTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab" aria-controls="dashboard" aria-selected="true">
+                    Sales Dashboard
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="payment-tab" data-bs-toggle="tab" data-bs-target="#payment" type="button" role="tab" aria-controls="payment" aria-selected="false">
+                    Payment & Billing
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="salesBillingTabContent">
+
+            <div class="tab-pane fade show active" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card p-3 shadow-sm">
+                            <h5>📅 Today's Sales</h5>
+                            <h3>RM <?= number_format($today['total'], 2) ?></h3>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card p-3 shadow-sm">
+                            <h5>🗓 This Month's Sales</h5>
+                            <h3>RM <?= number_format($month['total'], 2) ?></h3>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <a href="new_sale.php" class="btn btn-primary btn-lg w-100 shadow-sm" style="height: 100%; display: flex; align-items: center; justify-content: center;">+ New Sale / Transaction</a>
+                    </div>
+                </div>
+
+                <div class="card shadow p-4 mt-4">
+                    <h4>Recent Sales Transactions</h4>
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>Sale ID</th>
+                                <th>Patient</th>
+                                <th>Total</th>
+                                <th>Date</th>
+                                <th>Receipt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($recent)): ?>
+                                <tr><td colspan="5" class="text-center">No recent sales found.</td></tr>
+                            <?php else: ?>
+                                <?php foreach ($recent as $row) { ?>
+                                    <tr>
+                                        <td><?= $row['sale_id'] ?></td>
+                                        <td><?= htmlspecialchars($row['patient_name']) ?></td> 
+                                        <td>RM <?= number_format($row['total_amount'], 2) ?></td>
+                                        <td><?= $row['sale_date'] ?></td>
+                                        <td><a href="sales_receipt.php?sale_id=<?= $row['sale_id'] ?>" class="btn btn-success btn-sm">View</a></td>
+                                    </tr>
+                                <?php } ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="payment" role="tabpanel" aria-labelledby="payment-tab">
+                
+                <div class="card shadow p-4 mb-4">
+                    <h3 class="text-center text-primary">💵 Submit New Payment</h3>
+
+                    <form method="POST" action="sales_billing.php" class="mt-4">
+                        <input type="hidden" name="form_type" value="payment_insert"> 
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Prescription ID</label>
+                                <input type="number" name="prescription_id" class="form-control" required min="1">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Total Amount (RM)</label>
+                                <input type="number" step="0.01" name="total_amount" class="form-control" required>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100 mt-2">Submit Payment</button>
+                    </form>
+                </div>
+
+                <div class="card shadow p-4">
+                    <h3 class="text-center text-primary mb-4">Payment Records</h3>
+
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>Payment ID</th>
+                                <th>Prescription ID</th>
+                                <th>Total Amount</th>
+                                <th>Date</th>
+                                <th>Invoice</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <?php if (empty($payments)): ?>
+                                <tr><td colspan="5" class="text-center">No payment records found.</td></tr>
+                            <?php else: ?>
+                                <?php foreach ($payments as $row) { ?>
+                                <tr>
+                                    <td><?= $row['payment_id'] ?></td>
+                                    <td><?= $row['prescription_id'] ?></td>
+                                    <td>RM <?= number_format($row['total_amount'], 2) ?></td>
+                                    <td><?= $row['payment_date'] ?></td>
+                                    <td>
+                                        <a href="invoice.php?payment_id=<?= $row['payment_id'] ?>" 
+                                            class="btn btn-success btn-sm">Generate Invoice</a>
+                                    </td>
+                                </tr>
+                                <?php } ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div> 
+</div> 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
