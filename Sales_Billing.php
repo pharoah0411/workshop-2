@@ -1,6 +1,12 @@
 <?php
 // sales_billing.php - This file must be executed by the PHP interpreter (i.e., accessed via http://localhost/...)
 
+header('Content-Type: text/html; charset=utf-8'); // Add this line
+require_once "connection.php";
+
+// ... rest of your PHP code
+?>
+
 require_once "connection.php";
 
 if (!$pg_conn) {
