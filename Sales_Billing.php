@@ -80,7 +80,7 @@ try {
     <title>Sales and Billing</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; }
+        body { background-color: #87d2f0; }
         .card { border-radius: 12px; border: none; }
         .nav-link.active { background-color: #0066cc !important; color: white !important; }
         .nav-link { color: #0066cc; }
