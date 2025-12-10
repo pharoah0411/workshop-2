@@ -1,5 +1,5 @@
 <?php
-include "connectionSyameel.php";
+include "connection.php";
 include "header.php";
 
 $message = "";
