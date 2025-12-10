@@ -1,14 +1,24 @@
 <?php
-$conn = pg_connect("host=localhost port=5432 dbname=Workshop user=postgres password=admin");
+require_once "connection.php";
+
+if (!$pg_conn) {
+    die("❌ PostgreSQL Connection Failed");
+}
 
 $payment_id = $_GET['payment_id'];
 
-$sql = "SELECT * FROM public.payment WHERE payment_id = $payment_id";
-$result = pg_query($conn, $sql);
-$pay = pg_fetch_assoc($result);
+try {
+    $stmt = $pg_conn->prepare("SELECT * FROM public.payment WHERE payment_id = :pid");
+    $stmt->execute([":pid" => $payment_id]);
+    $pay = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$pay) {
-    die("Invoice not found.");
+    if (!$pay) {
+        die("Invoice not found.");
+    }
+
+} catch (PDOException $e) {
+    die("Error retrieving invoice: " . $e->getMessage());
 }
 
 include "invoice_view.html";
+

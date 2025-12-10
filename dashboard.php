@@ -158,7 +158,7 @@ $username = $_SESSION['username'] ?? 'User';
                 <div class="module-header"><h2>💰 Sales & Billing</h2></div>
                 <div class="module-content">
                     <ul>
-                        <li><a href="#">Sales Dashboard (Future Page)</a></li>
+                        <li><a href="Sales_Billing.php">Sales Dashboard (Future Page)</a></li>
                     </ul>
                 </div>
             </div>
@@ -167,7 +167,7 @@ $username = $_SESSION['username'] ?? 'User';
                 <div class="module-header"><h2>👤 User & Management</h2></div>
                 <div class="module-content">
                     <ul>
-                        <li><a href="#">User List / Dashboard (Future Page)</a></li>
+                        <li><a href="user_management.php">User List / Dashboard (Future Page)</a></li>
                     </ul>
                 </div>
             </div>

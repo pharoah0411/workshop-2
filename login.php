@@ -21,29 +21,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') {
         $error = "Please enter both username and password.";
     } else {
-        try {
-            // NOTE ON SECURITY: In a production application, you should never store
-            // plain text passwords. They should be hashed using password_hash(),
-            // and validated here using password_verify(). Since your sample data
-            // uses 'hashedpass', we are doing a simple string comparison for this demo.
-            $sql = "SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?";
-            
-            $user = null;
+        $user = null;
 
-            if (isset($pdo) && $pdo instanceof PDO) {
-                $stmt = $pdo->prepare($sql);
+        try {
+            // ---------------------------------------------------------
+            // 1. Check SQL Server (Primary check)
+            // ---------------------------------------------------------
+            // Check PDO driver
+            if (!$user && isset($pdo) && $pdo instanceof PDO) {
+                $stmt = $pdo->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?");
                 $stmt->execute([$username]);
-                $user = $stmt->fetch(PDO::FETCH_ASSOC);
-            } elseif (isset($conn)) {
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($res) $user = array_change_key_case($res, CASE_UPPER);
+            } 
+            // Check Legacy SQLSRV driver
+            // FIX: Added "&& $conn !== false" to prevent the TypeError if connection failed
+            elseif (!$user && isset($conn) && $conn !== false) {
+                $sql = "SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?";
                 $params = [$username];
-                $res = sqlsrv_query($conn, $sql, $params, array("Scrollable" => SQLSRV_CURSOR_KEYSET));
+                $res = sqlsrv_query($conn, $sql, $params);
                 if ($res !== false && sqlsrv_has_rows($res)) {
-                    $user = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC);
+                    $row = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC);
+                    if ($row) $user = array_change_key_case($row, CASE_UPPER);
                 }
             }
-            
+
+            // ---------------------------------------------------------
+            // 2. Check MySQL Connection #1
+            // ---------------------------------------------------------
+            if (!$user && isset($mysql_conn) && $mysql_conn instanceof mysqli) {
+                $stmt = $mysql_conn->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM `USER` WHERE USERNAME = ?");
+                if ($stmt) {
+                    $stmt->bind_param("s", $username);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    if ($result->num_rows > 0) {
+                        $res = $result->fetch_assoc();
+                        $user = array_change_key_case($res, CASE_UPPER);
+                    }
+                    $stmt->close();
+                }
+            }
+
+            // ---------------------------------------------------------
+            // 3. Check MySQL Connection #2
+            // ---------------------------------------------------------
+            if (!$user && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
+                $stmt = $mysql_conn2->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM `USER` WHERE USERNAME = ?");
+                if ($stmt) {
+                    $stmt->bind_param("s", $username);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    if ($result->num_rows > 0) {
+                        $res = $result->fetch_assoc();
+                        $user = array_change_key_case($res, CASE_UPPER);
+                    }
+                    $stmt->close();
+                }
+            }
+
+            // ---------------------------------------------------------
+            // 4. Check PostgreSQL Connection
+            // ---------------------------------------------------------
+            if (!$user && isset($pg_conn) && $pg_conn instanceof PDO) {
+                $stmt = $pg_conn->prepare('SELECT "USER_ID", "USERNAME", "PASSWORD", "ROLE" FROM "USER" WHERE "USERNAME" = ?');
+                $stmt->execute([$username]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($res) $user = array_change_key_case($res, CASE_UPPER);
+            }
+
+            // ---------------------------------------------------------
+            // Final Authentication Logic
+            // ---------------------------------------------------------
             if ($user && $user['PASSWORD'] === $password) {
-                // Authentication successful. Start session.
                 $_SESSION['user_id'] = $user['USER_ID'];
                 $_SESSION['username'] = $user['USERNAME'];
                 $_SESSION['role'] = $user['ROLE'];
@@ -51,6 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: dashboard.php');
                 exit;
             } else {
+                // If user was not found in ANY database or password didn't match
                 $error = "Invalid username or password.";
             }
 
@@ -67,7 +118,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Login</title>
     <style>
-        /* Reusing core CSS design */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); min-height: 100vh; padding: 20px; display: flex; justify-content: center; align-items: center; }
         .container { max-width: 400px; width: 100%; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); overflow: hidden; }
