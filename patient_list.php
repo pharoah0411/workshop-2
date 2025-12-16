@@ -3,12 +3,12 @@ include "connection.php";
 include "header.php";
 
 // Fetch patients + join with user table
+// FIX: Use COALESCE to ensure NAME is always pulled, either from patient (p.name) or user (u.name).
 $sql = "
 SELECT 
     p.patient_id,
-    u.name,
-    u.email,
-    u.phone,
+    u.user_id,
+    COALESCE(p.name, u.name) AS full_name, /* Get name from P if available, otherwise from U */
     p.gender,
     p.dob,
     p.ic_no,
@@ -23,6 +23,7 @@ JOIN \"user\" u ON p.user_id = u.user_id
 ORDER BY p.patient_id ASC
 ";
 
+// Assuming $pg_conn is the PostgreSQL connection object established in connection.php
 $stmt = $pg_conn->query($sql);
 $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -43,8 +44,6 @@ $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <tr style="background:#0b2f6d; color:white;">
         <th>ID</th>
         <th>Full Name</th>
-        <th>Email</th>
-        <th>Phone</th>
         <th>Gender</th>
         <th>DOB</th>
         <th>History</th>
@@ -54,9 +53,7 @@ $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php foreach($patients as $p): ?>
     <tr style="border-bottom:1px solid #ccc;">
         <td><?= $p['patient_id'] ?></td>
-        <td><?= htmlspecialchars($p['name']) ?></td>
-        <td><?= htmlspecialchars($p['email']) ?></td>
-        <td><?= htmlspecialchars($p['phone']) ?></td>
+        <td><?= htmlspecialchars($p['full_name']) ?></td> 
         <td><?= $p['gender'] ?></td>
         <td><?= $p['dob'] ?></td>
         <td><?= $p['history_count'] ?> record(s)</td>
@@ -76,6 +73,5 @@ $patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php endforeach; ?>
 </table>
 
-</div> <!-- end content -->
-</body>
+</div> </body>
 </html>
