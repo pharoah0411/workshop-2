@@ -173,13 +173,13 @@ $username = $_SESSION['username'] ?? 'User';
             </div>
 
              <div class="module-card">
-                <div class="module-header"><h2>📈 Reports & Analytics</h2></div>
-                <div class="module-content">
-                    <ul>
-                        <li><a href="#">Report Dashboard (Future Page)</a></li>
-                    </ul>
-                </div>
-            </div>
+    <div class="module-header"><h2>📈 Reports & Analytics</h2></div>
+    <div class="module-content">
+        <ul>
+            <li><a href="reports.php">📊 Report Dashboard</a></li>
+        </ul>
+    </div>
+</div>
 
         </section>
     </div>
