@@ -89,18 +89,3 @@ try {
         }
     }
 }
-
-// ==================================================================================
-// 4. EMERGENCY LOCAL FIX (Points to YOUR XAMPP)
-// ==================================================================================
-try {
-    // This connects to your local "pharmacy_db" we saw in your screenshot
-    $pdo = new PDO("mysql:host=localhost;dbname=pharmacy_db", "root", "");
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $conn = $pdo; // This ensures the login page uses THIS connection
-} catch (Exception $e) {
-    // If local fails, it will tell you why
-    die("Local Connection Failed: " . $e->getMessage());
-}
-
-?>
