@@ -1,99 +1,227 @@
 <?php
+
 require_once 'connection.php';
 
+
+
 // Start session to manage user state
+
 session_start();
 
+
+
 $error = '';
+
 $username = '';
 
+
+
 // Check if user is already logged in
+
 if (isset($_SESSION['user_id'])) {
+
     header('Location: dashboard.php');
+
     exit;
+
 }
+
+
 
 // --- Handle POST Request for Login ---
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
     $username = isset($_POST['username']) ? trim($_POST['username']) : '';
+
     $password = isset($_POST['password']) ? $_POST['password'] : '';
 
+
+
     if ($username === '' || $password === '') {
+
         $error = "Please enter both username and password.";
+
     } else {
+
         $user = null;
 
+
+
         try {
+
             // ---------------------------------------------------------
-            // 1. Universal PDO Check (SQL Server or MySQL via PDO)
+
+            // 1. Check SQL Server (Primary check)
+
             // ---------------------------------------------------------
+
+            // Check PDO driver
+
             if (!$user && isset($pdo) && $pdo instanceof PDO) {
-                try {
-                    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-                    // Standardize table name: Brackets for SQLSRV, Backticks for MySQL
-                    $table = ($driver === 'sqlsrv') ? "[USER]" : "`user`";
-                    
-                    $stmt = $pdo->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM $table WHERE USERNAME = ?");
-                    $stmt->execute([$username]);
-                    $res = $stmt->fetch(PDO::FETCH_ASSOC);
-                    if ($res) $user = array_change_key_case($res, CASE_UPPER);
-                } catch (Exception $e) { /* Skip if this connection is offline */ }
-            } 
+
+                $stmt = $pdo->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?");
+
+                $stmt->execute([$username]);
+
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($res) $user = array_change_key_case($res, CASE_UPPER);
+
+            }
+
+            // Check Legacy SQLSRV driver
+
+            // FIX: Added "&& $conn !== false" to prevent the TypeError if connection failed
+
+            elseif (!$user && isset($conn) && $conn !== false) {
+
+                $sql = "SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?";
+
+                $params = [$username];
+
+                $res = sqlsrv_query($conn, $sql, $params);
+
+                if ($res !== false && sqlsrv_has_rows($res)) {
+
+                    $row = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC);
+
+                    if ($row) $user = array_change_key_case($row, CASE_UPPER);
+
+                }
+
+            }
+
+
 
             // ---------------------------------------------------------
-            // 2. MySQL Secondary Checks (Farah's or other MySQL connections)
-            // ---------------------------------------------------------
-            $mysql_list = [];
-            if (isset($mysql_conn) && $mysql_conn instanceof mysqli) $mysql_list[] = $mysql_conn;
-            if (isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) $mysql_list[] = $mysql_conn2;
 
-            foreach ($mysql_list as $m_conn) {
-                if ($user) break;
-                try {
-                    $stmt = $m_conn->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM `user` WHERE USERNAME = ?");
-                    if ($stmt) {
-                        $stmt->bind_param("s", $username);
-                        $stmt->execute();
-                        $result = $stmt->get_result();
-                        if ($result && $result->num_rows > 0) {
-                            $res = $result->fetch_assoc();
-                            $user = array_change_key_case($res, CASE_UPPER);
-                        }
-                        $stmt->close();
+            // 2. Check MySQL Connection #1
+
+            // ---------------------------------------------------------
+
+            if (!$user && isset($mysql_conn) && $mysql_conn instanceof mysqli) {
+
+                $stmt = $mysql_conn->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM `USER` WHERE USERNAME = ?");
+
+                if ($stmt) {
+
+                    $stmt->bind_param("s", $username);
+
+                    $stmt->execute();
+
+                    $result = $stmt->get_result();
+
+                    if ($result->num_rows > 0) {
+
+                        $res = $result->fetch_assoc();
+
+                        $user = array_change_key_case($res, CASE_UPPER);
+
                     }
-                } catch (Exception $e) { /* Skip offline MySQL */ }
+
+                    $stmt->close();
+
+                }
+
             }
 
+
+
             // ---------------------------------------------------------
-            // 3. PostgreSQL Check
+
+            // 3. Check MySQL Connection #2
+
             // ---------------------------------------------------------
+
+            if (!$user && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
+
+                $stmt = $mysql_conn2->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM `USER` WHERE USERNAME = ?");
+
+                if ($stmt) {
+
+                    $stmt->bind_param("s", $username);
+
+                    $stmt->execute();
+
+                    $result = $stmt->get_result();
+
+                    if ($result->num_rows > 0) {
+
+                        $res = $result->fetch_assoc();
+
+                        $user = array_change_key_case($res, CASE_UPPER);
+
+                    }
+
+                    $stmt->close();
+
+                }
+
+            }
+
+
+
+            // ---------------------------------------------------------
+
+            // 4. Check PostgreSQL Connection
+
+            // ---------------------------------------------------------
+
             if (!$user && isset($pg_conn) && $pg_conn instanceof PDO) {
-                try {
-                    $stmt = $pg_conn->prepare('SELECT "USER_ID", "USERNAME", "PASSWORD", "ROLE" FROM "USER" WHERE "USERNAME" = ?');
-                    $stmt->execute([$username]);
-                    $res = $stmt->fetch(PDO::FETCH_ASSOC);
-                    if ($res) $user = array_change_key_case($res, CASE_UPPER);
-                } catch (Exception $e) { /* Skip offline PostgreSQL */ }
+
+                $stmt = $pg_conn->prepare('SELECT "USER_ID", "USERNAME", "PASSWORD", "ROLE" FROM "USER" WHERE "USERNAME" = ?');
+
+                $stmt->execute([$username]);
+
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($res) $user = array_change_key_case($res, CASE_UPPER);
+
             }
 
+
+
             // ---------------------------------------------------------
-            // Final Authentication
+
+            // Final Authentication Logic
+
             // ---------------------------------------------------------
+
             if ($user && $user['PASSWORD'] === $password) {
+
                 $_SESSION['user_id'] = $user['USER_ID'];
+
                 $_SESSION['username'] = $user['USERNAME'];
+
                 $_SESSION['role'] = $user['ROLE'];
+
+
+
                 header('Location: dashboard.php');
+
                 exit;
+
             } else {
+
+                // If user was not found in ANY database or password didn't match
+
                 $error = "Invalid username or password.";
+
             }
+
+
 
         } catch (Exception $e) {
+
             $error = 'Login error: ' . htmlspecialchars($e->getMessage());
+
         }
+
     }
+
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
