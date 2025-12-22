@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Prescription Dashboard (SQL Server API)</title>
+    <script src="presc_manager.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 30px; }
+        .view-section { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
+        .badge { padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 0.85em; }
+        .Pending { background: #fff3cd; color: #856404; }
+        .Completed { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="view-section">
+        <h2>📋 Prescription Dashboard <small>(API Mode)</small></h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Patient</th>
+                    <th>Pharmacist</th>
+                    <th>Date Issued</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="prescTableBody">
+                <tr><td colspan="5">Connecting to SQL Server...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function loadData() {
+            const tbody = document.getElementById('prescTableBody');
+            const data = await PrescManager.loadAll();
+
+            if (data.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='5'>No prescriptions found in Database.</td></tr>";
+                return;
+            }
+
+            tbody.innerHTML = data.map(p => `
+                <tr>
+                    <td>#${p.id}</td>
+                    <td>${p.patientName}</td>
+                    <td>${p.pharmacistName}</td>
+                    <td>${p.date}</td>
+                    <td><span class="badge ${p.status}">${p.status}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        window.onload = loadData;
+    </script>
+</body>
+</html>
