@@ -20,11 +20,32 @@ if ($type === 'excel') {
     // CSV Export (Excel compatible)
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=Inventory_Report_' . date('Ymd') . '.csv');
+    
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['ID', 'Medicine Name', 'Category', 'Stock', 'Expiry Date', 'Price']);
+    
+    // User-friendly Headers
+    fputcsv($output, ['Medicine ID', 'Medicine Name', 'Category', 'Stock Level', 'Expiry Date', 'Unit Price ($)']);
+    
     foreach ($all_meds as $m) {
-        fputcsv($output, [$m['MEDICINE_ID'], $m['NAME'], $m['CATEGORY_TYPE'], $m['QUANTITY_IN_STOCK'], $m['EXPIRY_DATE'], $m['UNIT_PRICE']]);
+        // 1. Format Price: Convert 0.2 to $0.20
+        $formattedPrice = '$' . number_format((float)$m['UNIT_PRICE'], 2);
+        
+        // 2. Format Date: Convert 2027-12-31 to 31-Dec-2027 (Better for non-IT users)
+        $formattedDate = !empty($m['EXPIRY_DATE']) 
+            ? date('d-M-Y', strtotime($m['EXPIRY_DATE'])) 
+            : 'N/A';
+
+        // Write row to CSV
+        fputcsv($output, [
+            $m['MEDICINE_ID'],
+            $m['NAME'],
+            $m['CATEGORY_TYPE'],
+            $m['QUANTITY_IN_STOCK'],
+            $formattedDate,
+            $formattedPrice
+        ]);
     }
+    
     fclose($output);
     exit;
 } elseif ($type === 'print' || $type === 'pdf') {
