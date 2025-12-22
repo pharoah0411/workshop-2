@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Medicine Inventory (SQL Server API)</title>
-    <script src="med_manager.js"></script>
+    <script src="med_manager.js?v=2"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 40px; }
         .medicines-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
@@ -20,12 +20,10 @@
     <script>
         async function refreshUI() {
             const container = document.getElementById('medicinesList');
-
-            // Call the load function from the fixed med_manager.js
             const medicines = await MedManager.load();
 
             if (medicines.length === 0) {
-                container.innerHTML = "<p>No data found. Check DBeaver or Console (F12) for errors.</p>";
+                container.innerHTML = "<p>No data found. Check Browser Console (F12) for error messages.</p>";
                 return;
             }
 

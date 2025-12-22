@@ -6,7 +6,12 @@ header("Access-Control-Allow-Origin: *");
 require_once 'connection.php'; // Uses your $pdo connection
 
 try {
-    // We convert the date to a string format so JSON doesn't break
+    // Check if the connection exists
+    if (!$pdo) {
+        throw new Exception("Database connection failed.");
+    }
+
+    // SQL Server specific query with date conversion
     $query = "SELECT MEDICINE_ID, NAME, QUANTITY_IN_STOCK, 
               CONVERT(VARCHAR, EXPIRY_DATE, 23) AS EXPIRY_DATE, 
               UNIT_PRICE FROM MEDICINE";
@@ -20,7 +25,7 @@ try {
         "data" => $medicines
     ]);
 
-} catch (PDOException $e) {
+} catch (Exception $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }

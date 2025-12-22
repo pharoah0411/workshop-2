@@ -1,20 +1,19 @@
 /* med_manager.js */
 (function(global){
-    // FIXED: Pointing to your main folder root (no /api subfolder)
+    // Point directly to your workshop-2 folder root
     const API_BASE = '/workshop-2'; 
 
     async function load(){
         try {
-            // FIXED: Pointing to api_medicine.php and only calling fetch ONCE
-            const res = await fetch(`${API_BASE}/api_medicine.php`);
+            // Added a timestamp (?t=...) to prevent the browser from using a cached result
+            const res = await fetch(`${API_BASE}/api_medicine.php?t=${Date.now()}`);
             
             if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
             
             const json = await res.json();
-            // Your API returns data inside a 'data' property
             const rawData = json.data || [];
 
-            // FIXED: Mapping SQL Server UPPERCASE fields to JavaScript names
+            // Mapping SQL Server UPPERCASE fields to JavaScript names
             return rawData.map(m => ({
                 id: m.MEDICINE_ID,
                 name: m.NAME,
