@@ -166,15 +166,14 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
         .stat-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; display: flex; align-items: center; gap: 15px; }
         .stat-number { font-size: 2em; font-weight: bold; color: #0066ff; }
         .controls { display: flex; gap: 15px; padding: 20px 30px; background: white; align-items: center; }
-        .btn-primary { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 8px; text-decoration: none; font-weight: 600; }
+        .btn-primary { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 8px; text-decoration: none; font-weight: 600; cursor: pointer; }
         .medicines-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; padding: 30px; }
         .medicine-card { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .medicine-name { font-size: 1.3em; font-weight: bold; }
         .stock-good { background: #c8e6c9; color: #2e7d32; padding: 8px; border-radius: 6px; text-align: center; margin: 10px 0; }
         .stock-low { background: #ffe0b2; color: #e65100; padding: 8px; border-radius: 6px; text-align: center; margin: 10px 0; }
-        .action-btn { padding: 8px 12px; border-radius: 6px; text-decoration: none; color: white; text-align: center; flex: 1; }
+        .action-btn { padding: 8px 12px; border-radius: 6px; text-decoration: none; color: white; text-align: center; flex: 1; border: none; cursor: pointer; }
         
-        /* Dropdown Styles */
         .dropdown-menu { display: none; position: absolute; top: 100%; left: 0; background: white; min-width: 220px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 1000; border: 1px solid #ddd; overflow: hidden; margin-top: 5px; }
         .dropdown-item { display: flex; align-items: center; gap: 10px; padding: 12px 16px; color: #333; text-decoration: none; border-bottom: 1px solid #eee; }
         .dropdown-item:hover { background: #f8f9fa; }
@@ -208,6 +207,19 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
             <div class="stat-card"><span>❌</span><div><h3>Expired</h3><p class="stat-number"><?php echo $expiredCount; ?></p></div></div>
         </div>
 
+        <div class="controls">
+            <a href="add_medicine.php" class="btn-primary">+ Add Medicine</a>
+
+            <div style="position: relative; display: inline-block;">
+                <button type="button" class="btn-primary" style="background: #28a745;" onclick="toggleExportMenu(event)">
+                    📤 Export Inventory ▼
+                </button>
+                <div id="exportMenu" class="dropdown-menu">
+                    <a href="export_medicine.php?type=excel" class="dropdown-item">📊 Excel Spreadsheet</a>
+                    <a href="export_medicine.php?type=pdf" target="_blank" class="dropdown-item">📄 PDF Document</a>
+                    <a href="export_medicine.php?type=print" target="_blank" class="dropdown-item">🖨️ Print List</a>
+                </div>
+            </div>
 
             <form method="GET" style="display:flex; gap:10px; flex:1">
                 <input type="text" name="search" placeholder="Search..." value="<?php echo htmlspecialchars($search_query); ?>" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ddd;">
@@ -244,7 +256,7 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
                         <form method="POST" style="flex:1" onsubmit="return confirm('Delete?');">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="id" value="<?php echo $m['MEDICINE_ID']; ?>">
-                            <button type="submit" class="action-btn" style="background:#ff6b6b; border:none; width:100%; cursor:pointer;">🗑️ Delete</button>
+                            <button type="submit" class="action-btn" style="background:#ff6b6b; border:none; width:100%;">🗑️ Delete</button>
                         </form>
                     </div>
                 </div>
@@ -259,7 +271,7 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
         menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
     }
     window.onclick = function(event) {
-        if (!event.target.matches('.btn-export')) {
+        if (!event.target.matches('.btn-primary')) {
             const menu = document.getElementById('exportMenu');
             if(menu) menu.style.display = 'none';
         }
