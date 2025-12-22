@@ -5,7 +5,7 @@
     <title>Medicine Inventory (SQL Server API)</title>
     <script src="med_manager.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 30px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 40px; }
         .medicines-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
         .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #0066ff; }
     </style>
@@ -13,24 +13,19 @@
 <body>
     <h1>🏥 Pharmacy Inventory <small>(SQL Server API Mode)</small></h1>
     
-    <div style="margin-bottom: 20px;">
-        <input type="text" id="apiSearch" placeholder="Search medicines..." oninput="refreshUI()" style="padding:12px; width:350px; border-radius:8px; border:1px solid #ddd;">
-    </div>
-
     <div id="medicinesList" class="medicines-list">
-        <p>Loading medicines...</p>
+        <p>Loading medicines from SQL Server...</p>
     </div>
 
     <script>
         async function refreshUI() {
             const container = document.getElementById('medicinesList');
-            const search = document.getElementById('apiSearch').value;
 
-            // Fetch through the MedManager bridge
-            const medicines = await MedManager.load('all', search);
+            // Call the load function from the fixed med_manager.js
+            const medicines = await MedManager.load();
 
             if (medicines.length === 0) {
-                container.innerHTML = "<p>No data found. Ensure api_medicine.php is working.</p>";
+                container.innerHTML = "<p>No data found. Check DBeaver or Console (F12) for errors.</p>";
                 return;
             }
 
@@ -38,8 +33,9 @@
                 <div class="card">
                     <h3>${m.name}</h3>
                     <p>ID: <code>${m.id}</code></p>
-                    <p>Stock: <strong>${m.stock}</strong></p>
+                    <p>Stock: <strong>${m.stock}</strong> units</p>
                     <p>Price: $${Number(m.price).toFixed(2)}</p>
+                    <p><small>Expires: ${m.expiryDate}</small></p>
                 </div>
             `).join('');
         }

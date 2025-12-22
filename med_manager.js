@@ -1,21 +1,20 @@
 /* med_manager.js */
 (function(global){
-    // Point to your main folder root
+    // FIXED: Pointing to your main folder root (no /api subfolder)
     const API_BASE = '/workshop-2'; 
 
-    async function load(filter = 'all', search = ''){
+    async function load(){
         try {
             // FIXED: Pointing to api_medicine.php and only calling fetch ONCE
-            let url = `${API_BASE}/api_medicine.php`;
-            if(search) url += `?search=${encodeURIComponent(search)}`;
-
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+            const res = await fetch(`${API_BASE}/api_medicine.php`);
             
-            const json = await response.json();
+            if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+            
+            const json = await res.json();
+            // Your API returns data inside a 'data' property
             const rawData = json.data || [];
 
-            // FIXED: Mapping SQL Server UPPERCASE fields to the names used in your UI
+            // FIXED: Mapping SQL Server UPPERCASE fields to JavaScript names
             return rawData.map(m => ({
                 id: m.MEDICINE_ID,
                 name: m.NAME,

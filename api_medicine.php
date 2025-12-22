@@ -5,24 +5,14 @@ header("Access-Control-Allow-Origin: *");
 
 require_once 'connection.php'; // Uses your $pdo connection
 
-$search = isset($_GET['search']) ? trim($_GET['search']) : '';
-
 try {
-    // Select the columns exactly as they appear in your SQL Server MEDICINE table
-    $query = "SELECT MEDICINE_ID, NAME, QUANTITY_IN_STOCK, EXPIRY_DATE, UNIT_PRICE FROM MEDICINE";
+    // We convert the date to a string format so JSON doesn't break
+    $query = "SELECT MEDICINE_ID, NAME, QUANTITY_IN_STOCK, 
+              CONVERT(VARCHAR, EXPIRY_DATE, 23) AS EXPIRY_DATE, 
+              UNIT_PRICE FROM MEDICINE";
     
-    if (!empty($search)) {
-        $query .= " WHERE NAME LIKE :search OR MEDICINE_ID LIKE :search";
-    }
-
     $stmt = $pdo->prepare($query);
-    
-    if (!empty($search)) {
-        $stmt->execute(['search' => "%$search%"]);
-    } else {
-        $stmt->execute();
-    }
-
+    $stmt->execute();
     $medicines = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([
