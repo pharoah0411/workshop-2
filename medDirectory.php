@@ -208,19 +208,6 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
             <div class="stat-card"><span>❌</span><div><h3>Expired</h3><p class="stat-number"><?php echo $expiredCount; ?></p></div></div>
         </div>
 
-        <div class="controls">
-            <a href="add_medicine.php" class="btn-primary">+ Add Medicine</a>
-
-            <div style="position: relative; display: inline-block;">
-                <button type="button" class="btn-primary" style="background: #28a745; cursor: pointer;" onclick="toggleExportMenu(event)">
-                    📤 Export Inventory ▼
-                </button>
-                <div id="exportMenu" class="dropdown-menu">
-                    <a href="export_medicine.php?type=excel" class="dropdown-item">📊 Excel Spreadsheet</a>
-                    <a href="export_medicine.php?type=pdf" target="_blank" class="dropdown-item">📄 PDF Document</a>
-                    <a href="export_medicine.php?type=print" target="_blank" class="dropdown-item">🖨️ Print List</a>
-                </div>
-            </div>
 
             <form method="GET" style="display:flex; gap:10px; flex:1">
                 <input type="text" name="search" placeholder="Search..." value="<?php echo htmlspecialchars($search_query); ?>" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ddd;">
