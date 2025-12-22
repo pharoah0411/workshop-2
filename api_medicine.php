@@ -1,19 +1,18 @@
 <?php
-// Set headers to return JSON and allow cross-origin requests
+// api_medicine.php
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
 
-// Include your existing connection logic
-require_once 'connection.php'; 
+require_once 'connection.php'; // Uses your $pdo connection
 
-$search = isset($_GET['search']) ? $_GET['search'] : '';
-$response = [];
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
 try {
-    // 1. Prepare SQL (Using your MEDICINE table)
+    // Select the columns exactly as they appear in your SQL Server MEDICINE table
     $query = "SELECT MEDICINE_ID, NAME, QUANTITY_IN_STOCK, EXPIRY_DATE, UNIT_PRICE FROM MEDICINE";
+    
     if (!empty($search)) {
-        $query .= " WHERE NAME LIKE :search";
+        $query .= " WHERE NAME LIKE :search OR MEDICINE_ID LIKE :search";
     }
 
     $stmt = $pdo->prepare($query);
@@ -26,20 +25,13 @@ try {
 
     $medicines = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 2. Build the JSON Response
-    $response = [
+    echo json_encode([
         "status" => "success",
-        "count" => count($medicines),
         "data" => $medicines
-    ];
+    ]);
 
 } catch (PDOException $e) {
     http_response_code(500);
-    $response = [
-        "status" => "error",
-        "message" => "Database error: " . $e->getMessage()
-    ];
+    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }
-
-echo json_encode($response, JSON_PRETTY_PRINT);
 ?>
