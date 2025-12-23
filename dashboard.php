@@ -124,8 +124,15 @@ $username = $_SESSION['username'] ?? 'User';
     <div class="container">
         <div class="controls-top">
             <span>Logged in as: **<?php echo htmlspecialchars($username); ?>** (Role: **<?php echo htmlspecialchars($userRole); ?>**)</span>
-            <a href="logout.php" class="btn btn-secondary">Log Out</a>
-        </div>
+
+            <div style="display: flex; gap; 10px;">
+                <?php if(strtolower($userRole) === 'admin'): ?>
+                    <a href="audit.php" class="btn" style="background: #0066ff; color: white;">🛡️ Audit Trail</a>
+                <?php endif; ?>
+         
+                <a href="logout.php" class="btn btn-secondary">Log Out</a>
+            </div>
+                </div>
         
         <header class="header">
             <div class="header-content">
