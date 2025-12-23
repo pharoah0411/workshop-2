@@ -194,12 +194,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($user && password_verify($password, $user['PASSWORD'])) {
 
-    $_SESSION['user_id'] = $user['USER_ID'];
-    $_SESSION['username'] = $user['USERNAME'];
-    $_SESSION['role'] = $user['ROLE'];
+              $_SESSION['user_id'] = $user['USER_ID'];
+              $_SESSION['username'] = $user['USERNAME'];
+              $_SESSION['role'] = $user['ROLE'];
 
-    header('Location: dashboard.php');
-    exit;
+                  // 🔐 AUDIT LOG — LOGIN SUCCESS
+                  require_once 'audit_trail.php';
+                  logAudit(
+                  $conn,
+                  'LOGIN',
+                  'Authentication',
+                'User logged into the system'
+              );
+              
+              header('Location: dashboard.php');
+              exit;
 
             } else {
 
