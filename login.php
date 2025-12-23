@@ -170,15 +170,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$user && isset($pg_conn) && $pg_conn instanceof PDO) {
 
-                $stmt = $pg_conn->prepare('SELECT "USER_ID", "USERNAME", "PASSWORD", "ROLE" FROM "USER" WHERE "USERNAME" = ?');
+    $stmt = $pg_conn->prepare(
+        'SELECT user_id, username, password, role
+         FROM "user"
+         WHERE username = ?'
+    );
 
-                $stmt->execute([$username]);
+    $stmt->execute([$username]);
+    $res = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                $res = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                if ($res) $user = array_change_key_case($res, CASE_UPPER);
-
-            }
+    if ($res) {
+        $user = array_change_key_case($res, CASE_UPPER);
+    }
+}
 
 
 
@@ -188,19 +192,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // ---------------------------------------------------------
 
-            if ($user && $user['PASSWORD'] === $password) {
+            if ($user && password_verify($password, $user['PASSWORD'])) {
 
-                $_SESSION['user_id'] = $user['USER_ID'];
+    $_SESSION['user_id'] = $user['USER_ID'];
+    $_SESSION['username'] = $user['USERNAME'];
+    $_SESSION['role'] = $user['ROLE'];
 
-                $_SESSION['username'] = $user['USERNAME'];
-
-                $_SESSION['role'] = $user['ROLE'];
-
-
-
-                header('Location: dashboard.php');
-
-                exit;
+    header('Location: dashboard.php');
+    exit;
 
             } else {
 
