@@ -184,4 +184,20 @@ $username = $_SESSION['username'] ?? 'User';
         </section>
     </div>
 </body>
+<div class="module-card">
+    <div class="module-header"><h2>📈 Reports & Analytics</h2></div>
+    <div class="module-content">
+        <ul>
+            <li><a href="#">Report Dashboard (Future Page)</a></li>
+            
+            <?php if ($userRole === 'Admin'): ?>
+                <li style="margin-top: 10px; border-top: 1px dotted #ccc; padding-top: 10px;">
+                    <a href="view_audit.php" style="color: #0099ff; font-weight: bold;">
+                        🛡️ View Audit Trail
+                    </a>
+                </li>
+            <?php endif; ?>
+        </ul>
+    </div>
+</div>
 </html>
