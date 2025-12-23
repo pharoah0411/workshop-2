@@ -1,6 +1,9 @@
 <?php
-function logAudit($conn, $action, $module, $description)
-{
+function logAudit($conn, $action, $module, $description) {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
     if (!isset($_SESSION['user_id'])) {
         return;
     }
@@ -10,40 +13,19 @@ function logAudit($conn, $action, $module, $description)
     $role     = $_SESSION['role'];
     $ip       = $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
 
-    $sql = "
-        INSERT INTO audit_trail
-        (
-            user_id,
-            username,
-            role,
-            action,
-            module,
-            description,
-            ip_address,
-            created_at
-        )
-        VALUES
-        (
-            :user_id,
-            :username,
-            :role,
-            :action,
-            :module,
-            :description,
-            :ip_address,
-            NOW()
-        )
-    ";
+    // Use '?' placeholders to support MySQL, SQL Server, and Postgres
+    $sql = "INSERT INTO audit_trail (user_id, username, role, action, module, description, ip_address, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
 
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([
-        ':user_id'     => $userId,
-        ':username'    => $username,
-        ':role'        => $role,
-        ':action'      => $action,
-        ':module'      => $module,
-        ':description' => $description,
-        ':ip_address'  => $ip
-    ]);
+    if ($conn instanceof PDO) {
+        // SQL Server / PostgreSQL
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([$userId, $username, $role, $action, $module, $description, $ip]);
+    } elseif ($conn instanceof mysqli) {
+        // MySQL
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("issssss", $userId, $username, $role, $action, $module, $description, $ip);
+        $stmt->execute();
+    }
 }
-
+?>
