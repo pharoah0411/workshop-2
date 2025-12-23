@@ -316,69 +316,373 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
     <title>Reports & Analytics</title>
     <!-- Chart.js Library -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Animate.css for extra animations -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
     
     <style>
         /* Shared Theme CSS */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); min-height: 100vh; padding: 20px; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); 
+            min-height: 100vh; 
+            padding: 20px;
+        }
         
-        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); overflow: hidden; padding-bottom: 40px; }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); 
+            overflow: hidden; 
+            padding-bottom: 40px; 
+        }
         
         /* Navigation Bar */
-        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; background: #1565c0; color: white; margin-bottom: 20px; border-radius: 8px 8px 0 0; }
-        .nav-links a { color: white; text-decoration: none; margin-left: 15px; font-weight: 500; transition: opacity 0.2s; }
-        .nav-links a:hover { opacity: 0.8; }
-        .btn-logout { padding: 6px 12px; border: 1px solid white; border-radius: 6px; background: transparent; color: white; cursor: pointer; text-decoration: none; font-size: 0.9em; }
-        .btn-logout:hover { background: rgba(255, 255, 255, 0.1); }
+        .top-nav { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 15px 30px; 
+            background: #1565c0; 
+            color: white; 
+            margin-bottom: 20px; 
+            border-radius: 8px 8px 0 0; 
+            animation: slideInDown 0.8s ease-out;
+        }
+        .nav-links a { 
+            color: white; 
+            text-decoration: none; 
+            margin-left: 15px; 
+            font-weight: 500; 
+            transition: all 0.3s;
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+        .nav-links a:hover { 
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .btn-logout { 
+            padding: 8px 16px; 
+            border: 1px solid white; 
+            border-radius: 6px; 
+            background: transparent; 
+            color: white; 
+            cursor: pointer; 
+            text-decoration: none; 
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+        .btn-logout:hover { 
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(255,255,255,0.2);
+        }
 
         /* Export Buttons */
-        .export-section { padding: 20px 30px; background: #f8f9fa; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .export-buttons { display: flex; gap: 10px; }
-        .btn-export { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; transition: all 0.3s; font-size: 14px; }
-        .btn-export.pdf { background: #dc3545; color: white; }
-        .btn-export.pdf:hover { background: #c82333; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3); }
-        .btn-export.print { background: #28a745; color: white; }
-        .btn-export.print:hover { background: #218838; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3); }
-        .btn-export.excel { background: #17a2b8; color: white; }
-        .btn-export.excel:hover { background: #138496; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(23, 162, 184, 0.3); }
+        .export-section { 
+            padding: 20px 30px; 
+            background: #f8f9fa; 
+            border-bottom: 1px solid #eee; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            animation: fadeIn 1s ease-out;
+        }
+        .export-buttons { 
+            display: flex; 
+            gap: 10px; 
+        }
+        .btn-export { 
+            padding: 12px 24px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 600; 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 10px; 
+            text-decoration: none; 
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-size: 14px;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-export::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        .btn-export:hover::after {
+            width: 300px;
+            height: 300px;
+        }
+        .btn-export.pdf { 
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); 
+            color: white; 
+        }
+        .btn-export.pdf:hover { 
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 8px 20px rgba(220, 53, 69, 0.4);
+        }
+        .btn-export.print { 
+            background: linear-gradient(135deg, #28a745 0%, #218838 100%); 
+            color: white; 
+        }
+        .btn-export.print:hover { 
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 8px 20px rgba(40, 167, 69, 0.4);
+        }
+        .btn-export.excel { 
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); 
+            color: white; 
+        }
+        .btn-export.excel:hover { 
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 8px 20px rgba(23, 162, 184, 0.4);
+        }
 
         /* Header */
-        .header { background: #f8f9fa; padding: 20px 30px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .header h1 { color: #0066ff; font-size: 1.8em; margin: 0; }
-        .date-badge { background: #e3f2fd; color: #1565c0; padding: 5px 15px; border-radius: 20px; font-size: 0.9em; font-weight: 600; }
+        .header { 
+            background: #f8f9fa; 
+            padding: 25px 30px; 
+            border-bottom: 1px solid #eee; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            animation: fadeInUp 0.8s ease-out;
+        }
+        .header h1 { 
+            color: #0066ff; 
+            font-size: 2em; 
+            margin: 0; 
+            background: linear-gradient(135deg, #0066ff, #0099ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .date-badge { 
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); 
+            color: #1565c0; 
+            padding: 8px 20px; 
+            border-radius: 25px; 
+            font-size: 0.9em; 
+            font-weight: 600;
+            box-shadow: 0 4px 10px rgba(0, 102, 255, 0.1);
+            animation: pulse 2s infinite;
+        }
 
         /* Summary Cards */
-        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; padding: 30px; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; border-bottom: 4px solid transparent; transition: transform 0.2s; }
-        .card:hover { transform: translateY(-5px); }
+        .summary-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 25px; 
+            padding: 30px; 
+        }
+        .card { 
+            background: white; 
+            padding: 25px; 
+            border-radius: 15px; 
+            box-shadow: 0 6px 20px rgba(0,0,0,0.08); 
+            text-align: center; 
+            border-bottom: 5px solid transparent; 
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+            animation: fadeIn 0.8s ease-out backwards;
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            transition: left 0.7s;
+        }
+        .card:hover::before {
+            left: 100%;
+        }
+        .card:hover { 
+            transform: translateY(-10px) scale(1.03);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+        }
         
-        .card h2 { font-size: 2.5em; margin: 10px 0; color: #333; }
-        .card p { color: #666; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px; }
+        .card h2 { 
+            font-size: 2.8em; 
+            margin: 15px 0; 
+            color: #333;
+            transition: all 0.3s;
+        }
+        .card:hover h2 {
+            transform: scale(1.1);
+        }
+        .card p { 
+            color: #666; 
+            font-size: 0.9em; 
+            text-transform: uppercase; 
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
         
-        /* Card Colors */
-        .card.blue { border-color: #0066ff; } .card.blue h2 { color: #0066ff; }
-        .card.green { border-color: #28a745; } .card.green h2 { color: #28a745; }
-        .card.orange { border-color: #fd7e14; } .card.orange h2 { color: #fd7e14; }
-        .card.red { border-color: #dc3545; } .card.red h2 { color: #dc3545; }
+        /* Card Colors with animation delays */
+        .card.blue { 
+            border-color: #0066ff; 
+            animation-delay: 0.1s;
+        }
+        .card.blue:hover h2 { color: #0066ff; }
+        
+        .card.green { 
+            border-color: #28a745; 
+            animation-delay: 0.2s;
+        }
+        .card.green:hover h2 { color: #28a745; }
+        
+        .card.orange { 
+            border-color: #fd7e14; 
+            animation-delay: 0.3s;
+        }
+        .card.orange:hover h2 { color: #fd7e14; }
+        
+        .card.red { 
+            border-color: #dc3545; 
+            animation-delay: 0.4s;
+        }
+        .card.red:hover h2 { color: #dc3545; }
 
         /* Charts Section */
-        .charts-section { padding: 0 30px; display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 30px; }
-        .chart-container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #eee; }
-        .chart-container h3 { color: #333; margin-bottom: 20px; font-size: 1.2em; border-left: 4px solid #0066ff; padding-left: 10px; }
+        .charts-section { 
+            padding: 0 30px; 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); 
+            gap: 30px; 
+        }
+        .chart-container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 15px; 
+            box-shadow: 0 6px 20px rgba(0,0,0,0.08); 
+            border: 1px solid #eee; 
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.8s ease-out backwards;
+        }
+        .chart-container:hover {
+            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+            transform: translateY(-5px);
+        }
+        .chart-container h3 { 
+            color: #333; 
+            margin-bottom: 25px; 
+            font-size: 1.3em; 
+            border-left: 5px solid #0066ff; 
+            padding-left: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
         /* Full Width Chart */
-        .chart-full { grid-column: 1 / -1; }
+        .chart-full { 
+            grid-column: 1 / -1; 
+            animation-delay: 0.1s;
+        }
+
+        /* Animations */
+        @keyframes slideInDown {
+            from {
+                transform: translateY(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 4px 10px rgba(0, 102, 255, 0.1);
+            }
+            50% {
+                box-shadow: 0 4px 20px rgba(0, 102, 255, 0.3);
+            }
+            100% {
+                box-shadow: 0 4px 10px rgba(0, 102, 255, 0.1);
+            }
+        }
+
+        /* Tooltip Styles */
+        .chart-tooltip {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
 
         @media (max-width: 768px) {
             .charts-section { grid-template-columns: 1fr; }
             .export-section { flex-direction: column; gap: 15px; align-items: flex-start; }
             .export-buttons { flex-wrap: wrap; }
+            .btn-export { padding: 10px 15px; font-size: 12px; }
+            .header h1 { font-size: 1.5em; }
         }
         
         @media print {
             .no-print { display: none !important; }
             .container { box-shadow: none; margin: 0; padding: 0; }
             body { background: white; padding: 0; }
+        }
+        
+        /* Loading Animation for Charts */
+        .chart-loading {
+            width: 100%;
+            height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f8f9fa;
+            border-radius: 10px;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .chart-loading::after {
+            content: 'Loading chart data...';
+            color: #666;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -389,54 +693,55 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
         <header class="top-nav no-print">
             <div class="user-info">
                 Welcome, <strong><?php echo htmlspecialchars($username); ?></strong>
+                <span style="font-size: 0.8em; opacity: 0.9;">(<?php echo htmlspecialchars($userRole); ?>)</span>
             </div>
             <div class="nav-links">
-                <a href="dashboard.php">🏠 Dashboard</a>
-                <a href="medDirectory.php">📦 Medicines</a>
-                <a href="reports.php" style="text-decoration: underline;">📊 Reports</a>
-                <a href="logout.php" class="btn-logout">Log Out</a>
+                <a href="dashboard.php" class="animate__animated animate__fadeIn">🏠 Dashboard</a>
+                <a href="medDirectory.php" class="animate__animated animate__fadeIn">📦 Medicines</a>
+                <a href="reports.php" style="text-decoration: underline;" class="animate__animated animate__fadeIn">📊 Reports</a>
+                <a href="logout.php" class="btn-logout animate__animated animate__fadeIn">Log Out</a>
             </div>
         </header>
 
         <!-- Export Buttons -->
         <div class="export-section no-print">
             <div>
-                <h2 style="color: #333; margin: 0;">Analytics Dashboard</h2>
+                <h2 style="color: #333; margin: 0; font-size: 1.5em;">Analytics Dashboard</h2>
                 <p style="color: #666; margin: 5px 0 0 0; font-size: 0.9em;">Real-time pharmacy statistics and insights</p>
             </div>
             <div class="export-buttons">
-                <a href="?export=pdf" class="btn-export pdf" target="_blank">
+                <a href="?export=pdf" class="btn-export pdf animate__animated animate__bounceIn" target="_blank" style="animation-delay: 0.2s">
                     📄 Download PDF
                 </a>
-                <button onclick="window.print()" class="btn-export print">
+                <button onclick="window.print()" class="btn-export print animate__animated animate__bounceIn" style="animation-delay: 0.3s">
                     🖨️ Print Report
                 </button>
-                <button onclick="exportToExcel()" class="btn-export excel">
+                <button onclick="exportToExcel()" class="btn-export excel animate__animated animate__bounceIn" style="animation-delay: 0.4s">
                     📊 Export Excel
                 </button>
             </div>
         </div>
 
         <div class="header">
-            <h1>📊 Operational Analytics</h1>
-            <span class="date-badge">Today: <?php echo date("d M Y"); ?></span>
+            <h1 class="animate__animated animate__fadeIn">📊 Operational Analytics</h1>
+            <span class="date-badge animate__animated animate__pulse animate__infinite">Today: <?php echo date("d M Y"); ?></span>
         </div>
 
         <!-- Metric Cards -->
         <div class="summary-grid">
-            <div class="card blue">
+            <div class="card blue animate__animated animate__fadeInUp">
                 <h2><?php echo number_format($totalPrescriptions); ?></h2>
                 <p>Total Prescriptions</p>
             </div>
-            <div class="card green">
+            <div class="card green animate__animated animate__fadeInUp">
                 <h2>RM <?php echo number_format($monthlySales, 2); ?></h2>
                 <p>Monthly Revenue</p>
             </div>
-            <div class="card orange">
+            <div class="card orange animate__animated animate__fadeInUp">
                 <h2><?php echo number_format($totalPatients); ?></h2>
                 <p>Registered Patients</p>
             </div>
-            <div class="card red">
+            <div class="card red animate__animated animate__fadeInUp">
                 <h2><?php echo number_format($lowStockCount); ?></h2>
                 <p>Low Stock Items</p>
             </div>
@@ -466,50 +771,155 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
         </div>
     </div>
 
-    <!-- Chart Logic -->
+    <!-- Chart Logic with Advanced Animations -->
     <script>
-        // Colors from your theme
-        const themeColor = '#0066ff';
-        const themeLight = '#e3f2fd';
+        // Enhanced colors with gradients
+        const themeColors = {
+            primary: '#0066ff',
+            secondary: '#28a745',
+            warning: '#fd7e14',
+            danger: '#dc3545',
+            info: '#17a2b8',
+            dark: '#6c757d'
+        };
         
-        // 1. Sales Line Chart
-        new Chart(document.getElementById('salesChart'), {
+        // Custom hover plugin for Chart.js
+        const hoverAnimation = {
+            id: 'hoverAnimation',
+            beforeDraw: (chart) => {
+                const activeElements = chart.getActiveElements();
+                if (activeElements.length > 0) {
+                    const ctx = chart.ctx;
+                    const element = activeElements[0];
+                    const dataset = chart.data.datasets[element.datasetIndex];
+                    const meta = chart.getDatasetMeta(element.datasetIndex);
+                    
+                    // Highlight the active element
+                    if (meta.type === 'bar') {
+                        const bar = meta.data[element.index];
+                        const originalColor = dataset.backgroundColor[element.index];
+                        
+                        // Create gradient effect
+                        const gradient = ctx.createLinearGradient(0, bar.y, 0, bar.base);
+                        gradient.addColorStop(0, lightenColor(originalColor, 40));
+                        gradient.addColorStop(1, originalColor);
+                        
+                        // Apply the gradient
+                        bar._model.backgroundColor = gradient;
+                    }
+                }
+            }
+        };
+
+        // Helper function to lighten colors
+        function lightenColor(color, percent) {
+            const num = parseInt(color.replace('#', ''), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = (num >> 16) + amt;
+            const G = (num >> 8 & 0x00FF) + amt;
+            const B = (num & 0x0000FF) + amt;
+            return `#${(
+                0x1000000 +
+                (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+                (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+                (B < 255 ? (B < 1 ? 0 : B) : 255)
+            )
+                .toString(16)
+                .slice(1)}`;
+        }
+
+        // 1. Sales Line Chart with Interactive Points
+        const salesChart = new Chart(document.getElementById('salesChart'), {
             type: 'line',
             data: {
                 labels: <?php echo json_encode($salesDays); ?>,
                 datasets: [{
                     label: 'Sales (RM)',
                     data: <?php echo json_encode($salesTotals); ?>,
-                    borderColor: themeColor,
+                    borderColor: themeColors.primary,
                     backgroundColor: 'rgba(0, 102, 255, 0.1)',
-                    borderWidth: 3,
+                    borderWidth: 4,
                     pointBackgroundColor: '#fff',
-                    pointBorderColor: themeColor,
-                    pointRadius: 5,
+                    pointBorderColor: themeColors.primary,
+                    pointBorderWidth: 3,
+                    pointRadius: 6,
+                    pointHoverRadius: 10,
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: themeColors.primary,
+                    pointHoverBorderWidth: 4,
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    pointHitRadius: 20
                 }]
             },
             options: {
                 responsive: true,
-                plugins: { legend: { display: false } },
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: themeColors.primary,
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                return `Sales: RM ${context.raw.toLocaleString()}`;
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 2000,
+                    easing: 'easeOutQuart'
+                },
+                hover: {
+                    mode: 'nearest',
+                    intersect: true,
+                    animationDuration: 400
+                },
                 scales: {
                     y: { 
                         beginAtZero: true, 
-                        grid: { color: '#f0f0f0' },
+                        grid: { 
+                            color: '#f0f0f0',
+                            drawBorder: false
+                        },
                         ticks: {
                             callback: function(value) {
                                 return 'RM ' + value.toLocaleString();
+                            },
+                            font: {
+                                size: 12,
+                                weight: 'bold'
                             }
                         }
                     },
-                    x: { grid: { display: false } }
+                    x: { 
+                        grid: { 
+                            display: false 
+                        },
+                        ticks: {
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index',
+                },
+                onHover: (event, chartElement) => {
+                    event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
                 }
             }
         });
 
-        // 2. Medicine Bar Chart
-        new Chart(document.getElementById('medChart'), {
+        // 2. Medicine Bar Chart with Hover Animation
+        const medChart = new Chart(document.getElementById('medChart'), {
             type: 'bar',
             data: {
                 labels: <?php echo json_encode($medNames); ?>,
@@ -519,25 +929,90 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
                     backgroundColor: [
                         '#0066ff', '#28a745', '#fd7e14', '#17a2b8', '#6c757d'
                     ],
-                    borderRadius: 5
+                    borderColor: [
+                        '#0056cc', '#1e7e34', '#e96c00', '#117a8b', '#545b62'
+                    ],
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    hoverBackgroundColor: [
+                        lightenColor('#0066ff', 30),
+                        lightenColor('#28a745', 30),
+                        lightenColor('#fd7e14', 30),
+                        lightenColor('#17a2b8', 30),
+                        lightenColor('#6c757d', 30)
+                    ],
+                    hoverBorderWidth: 3
                 }]
             },
+            plugins: [hoverAnimation],
             options: {
                 responsive: true,
-                plugins: { legend: { display: false } },
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: themeColors.primary,
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.label}: ${context.raw.toLocaleString()} prescriptions`;
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1500,
+                    easing: 'easeOutBounce'
+                },
                 scales: { 
                     y: { 
                         beginAtZero: true,
+                        grid: {
+                            color: '#f0f0f0',
+                            drawBorder: false
+                        },
                         ticks: {
-                            precision: 0
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
                         }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        }
+                    }
+                },
+                onHover: (event, chartElement) => {
+                    if (chartElement.length > 0) {
+                        const index = chartElement[0].index;
+                        const dataset = medChart.data.datasets[0];
+                        
+                        // Add bounce animation on hover
+                        const bars = medChart.getDatasetMeta(0).data;
+                        bars.forEach((bar, i) => {
+                            if (i === index) {
+                                bar._model.y = bar._model.y - 10;
+                            }
+                        });
+                        medChart.update('active');
                     }
                 }
             }
         });
 
-        // 3. Stock Pie Chart
-        new Chart(document.getElementById('stockChart'), {
+        // 3. Stock Pie Chart with Hover Effects
+        const stockChart = new Chart(document.getElementById('stockChart'), {
             type: 'doughnut',
             data: {
                 labels: <?php echo json_encode($stockNames); ?>,
@@ -546,17 +1021,94 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
                     backgroundColor: [
                         '#0066ff', '#28a745', '#ffc107', '#dc3545', '#6f42c1'
                     ],
-                    borderWidth: 0
+                    borderColor: '#fff',
+                    borderWidth: 3,
+                    hoverBackgroundColor: [
+                        lightenColor('#0066ff', 30),
+                        lightenColor('#28a745', 30),
+                        lightenColor('#ffc107', 30),
+                        lightenColor('#dc3545', 30),
+                        lightenColor('#6f42c1', 30)
+                    ],
+                    hoverBorderWidth: 5,
+                    hoverOffset: 20
                 }]
             },
             options: {
                 responsive: true,
-                cutout: '70%',
+                cutout: '65%',
+                animation: {
+                    animateScale: true,
+                    animateRotate: true,
+                    duration: 2000,
+                    easing: 'easeOutQuart'
+                },
                 plugins: {
-                    legend: { position: 'right' }
+                    legend: { 
+                        position: 'right',
+                        labels: {
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            },
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: themeColors.primary,
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} units (${percentage}%)`;
+                            }
+                        }
+                    }
+                },
+                onHover: (event, chartElement) => {
+                    if (chartElement.length > 0) {
+                        event.native.target.style.cursor = 'pointer';
+                        
+                        // Add rotation animation on hover
+                        stockChart.options.animation.animateRotate = true;
+                        stockChart.update();
+                    } else {
+                        event.native.target.style.cursor = 'default';
+                    }
                 }
             }
         });
+
+        // Add click events to charts
+        document.getElementById('medChart').onclick = function(evt) {
+            const points = medChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+            if (points.length) {
+                const firstPoint = points[0];
+                const label = medChart.data.labels[firstPoint.index];
+                const value = medChart.data.datasets[firstPoint.datasetIndex].data[firstPoint.index];
+                
+                // Create a popup effect
+                alert(`📊 ${label}\nTotal Prescriptions: ${value.toLocaleString()}`);
+                
+                // Add bounce animation
+                const bar = medChart.getDatasetMeta(0).data[firstPoint.index];
+                bar._model.y = bar._model.y - 15;
+                medChart.update();
+                
+                // Reset after animation
+                setTimeout(() => {
+                    bar._model.y = bar._model.y + 15;
+                    medChart.update();
+                }, 300);
+            }
+        };
 
         // Export to Excel function
         function exportToExcel() {
@@ -583,9 +1135,42 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            // Show notification
-            alert('Excel file downloaded successfully!');
+            // Show notification with animation
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #28a745;
+                color: white;
+                padding: 15px 25px;
+                border-radius: 8px;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                z-index: 9999;
+                animation: slideInRight 0.5s ease-out;
+            `;
+            notification.innerHTML = '✅ Excel file downloaded successfully!';
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'fadeOut 0.5s ease-out';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
         }
+
+        // Add CSS for notifications
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes fadeOut {
+                from { opacity: 1; }
+                to { opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 
 </body>
