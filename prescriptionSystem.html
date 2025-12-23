@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Prescription Management (API Mode)</title>
+    <script src="presc_manager.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 30px; }
+        .view-section { display: none; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .active-view { display: block; }
+        .btn { padding: 10px 15px; background: #0066ff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
+        .status-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.85em; background: #e0e0e0; }
+    </style>
+</head>
+<body>
+
+    <div style="margin-bottom: 20px;">
+        <button class="btn" onclick="showView('dashboardView')">📋 Dashboard</button>
+        <button class="btn" onclick="showView('createView')" style="background: #28a745;">+ New Prescription</button>
+    </div>
+
+    <div id="dashboardView" class="view-section active-view">
+        <h2>Prescription Dashboard</h2>
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Patient</th><th>Medicine</th><th>Date</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="prescTableBody">
+                <tr><td colspan="6">Loading prescriptions...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="createView" class="view-section">
+        <h2>✍️ Create New Prescription</h2>
+        <form onsubmit="event.preventDefault(); alert('In a full system, this would call an ADD API.');">
+            <div style="margin-bottom: 15px;">
+                <label>Patient ID:</label><br>
+                <input type="text" style="width: 100%; padding: 8px;" required>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label>Medicine ID:</label><br>
+                <input type="text" style="width: 100%; padding: 8px;" required>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label>Dosage Instructions:</label><br>
+                <textarea style="width: 100%; padding: 8px;" rows="3"></textarea>
+            </div>
+            <button type="submit" class="btn">Save Prescription</button>
+            <button type="button" class="btn" style="background:#6c757d" onclick="showView('dashboardView')">Cancel</button>
+        </form>
+    </div>
+
+    <div id="detailsView" class="view-section">
+        <h2>🔍 Prescription Details</h2>
+        <div id="detailsContent" style="line-height: 1.6;"></div>
+        <br>
+        <button class="btn" onclick="showView('dashboardView')">Back to Dashboard</button>
+    </div>
+
+    <script>
+        // Controller to switch between "pages"
+        function showView(viewId) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active-view'));
+            document.getElementById(viewId).classList.add('active-view');
+            if(viewId === 'dashboardView') loadDashboardData();
+        }
+
+        // Fetch data from SQL Server and fill the table
+        async function loadDashboardData() {
+            const tbody = document.getElementById('prescTableBody');
+            const data = await PrescManager.loadAll();
+
+            if (data.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='6'>No prescriptions found.</td></tr>";
+                return;
+            }
+
+            tbody.innerHTML = data.map(p => `
+                <tr>
+                    <td>${p.id}</td>
+                    <td>${p.patientId}</td>
+                    <td>${p.medicineId}</td>
+                    <td>${p.date}</td>
+                    <td><span class="status-badge">${p.status}</span></td>
+                    <td><button onclick="viewDetails('${p.id}')">View Details</button></td>
+                </tr>
+            `).join('');
+        }
+
+        // Show specific details for one prescription
+        async function viewDetails(id) {
+            const data = await PrescManager.loadAll();
+            const p = data.find(item => item.id == id);
+            
+            document.getElementById('detailsContent').innerHTML = `
+                <p><strong>Prescription ID:</strong> ${p.id}</p>
+                <p><strong>Patient ID:</strong> ${p.patientId}</p>
+                <p><strong>Medicine ID:</strong> ${p.medicineId}</p>
+                <p><strong>Date:</strong> ${p.date}</p>
+                <p><strong>Dosage:</strong> ${p.dosage}</p>
+                <p><strong>Duration:</strong> ${p.duration}</p>
+                <p><strong>Status:</strong> ${p.status}</p>
+            `;
+            showView('detailsView');
+        }
+
+        // Initial Load
+        window.onload = loadDashboardData;
+    </script>
+</body>
+</html>
