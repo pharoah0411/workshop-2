@@ -1,16 +1,12 @@
 <?php
-function logAudit(
-    $conn,
-    $action,
-    $module,
-    $description
-) {
+function logAudit($conn, $action, $module, $description) {
+
     if (!isset($_SESSION['user_id'])) {
         return;
     }
 
     $userId   = $_SESSION['user_id'];
-    $username = $_SESSION['username'];
+    $username = $_SESSION['username']; // Admin / Staff / Pharmacist
     $role     = $_SESSION['role'];
     $ip       = $_SERVER['REMOTE_ADDR'];
 
@@ -28,7 +24,4 @@ function logAudit(
         ':role' => $role,
         ':action' => $action,
         ':module' => $module,
-        ':description' => $description,
-        ':ip' => $ip
-    ]);
-}
+        ':descr
