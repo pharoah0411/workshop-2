@@ -1,27 +1,49 @@
 <?php
-function logAudit($conn, $action, $module, $description) {
-
+function logAudit($conn, $action, $module, $description)
+{
     if (!isset($_SESSION['user_id'])) {
         return;
     }
 
     $userId   = $_SESSION['user_id'];
-    $username = $_SESSION['username']; // Admin / Staff / Pharmacist
+    $username = $_SESSION['username'];
     $role     = $_SESSION['role'];
-    $ip       = $_SERVER['REMOTE_ADDR'];
+    $ip       = $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
 
     $sql = "
         INSERT INTO audit_trail
-        (user_id, username, role, action, module, description, ip_address)
+        (
+            user_id,
+            username,
+            role,
+            action,
+            module,
+            description,
+            ip_address,
+            created_at
+        )
         VALUES
-        (:user_id, :username, :role, :action, :module, :description, :ip)
+        (
+            :user_id,
+            :username,
+            :role,
+            :action,
+            :module,
+            :description,
+            :ip_address,
+            NOW()
+        )
     ";
 
     $stmt = $conn->prepare($sql);
     $stmt->execute([
-        ':user_id' => $userId,
-        ':username' => $username,
-        ':role' => $role,
-        ':action' => $action,
-        ':module' => $module,
-        ':descr
+        ':user_id'     => $userId,
+        ':username'    => $username,
+        ':role'        => $role,
+        ':action'      => $action,
+        ':module'      => $module,
+        ':description' => $description,
+        ':ip_address'  => $ip
+    ]);
+}
+
