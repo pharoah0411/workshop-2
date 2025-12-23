@@ -19,7 +19,8 @@ function logAudit($conn, $action, $module, $description)
             action,
             module,
             description,
-            ip_address
+            ip_address,
+            created_at
         )
         VALUES
         (
@@ -29,7 +30,8 @@ function logAudit($conn, $action, $module, $description)
             :action,
             :module,
             :description,
-            :ip
+            :ip_address,
+            NOW()
         )
     ";
 
@@ -41,6 +43,7 @@ function logAudit($conn, $action, $module, $description)
         ':action'      => $action,
         ':module'      => $module,
         ':description' => $description,
-        ':ip'          => $ip
+        ':ip_address'  => $ip
     ]);
 }
+
