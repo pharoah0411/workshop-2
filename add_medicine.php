@@ -1,5 +1,6 @@
 <?php
 require_once 'connection.php';
+require_once 'audit.php';
 
 $error = '';
 
@@ -48,8 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     sqlsrv_query($conn, $sql, $params);
                 }
             } catch (Exception $e) { /* Ignore */ }
-        }
-
+          } 
+            // --- NEW AUDIT LOG CODE START ---
+            // Identify which connection to use for logging the audit
+            $activeConn = $pdo ?? $mysql_conn2 ?? $pg_conn;
+            if ($activeConn) {
+              logAudit($activeConn, 'ADD', 'Inventory', "Added medicine: $name to $target_source database");
+            }
+            // --- NEW AUDIT LOG CODE END ---
+            
         header('Location: medDirectory.php');
         exit;
     }
