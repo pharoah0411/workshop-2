@@ -1,7 +1,5 @@
 <?php
 session_start();
-require_once 'connection.php';
-require_once 'audit.php'; // 
 
 // ... some code to handle the form ...
 
@@ -24,6 +22,9 @@ if (!isset($_SESSION['user_id'])) {
 
 $userRole = $_SESSION['role'] ?? 'Pharmacist';
 $username = $_SESSION['username'] ?? 'User';
+
+require_once 'connection.php';
+require_once 'audit.php'; //
 
 // --- Connection Status ---
 $status_mysql2 = (isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) ? "✅ Connected" : "❌ Failed";
