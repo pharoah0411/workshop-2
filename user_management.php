@@ -88,17 +88,6 @@
         </div>
     </div>
 
-    <!-- ACTIVITY LOG MODULE -->
-    <div class="module-card">
-        <div class="module-header">
-            <h2>📜 Activity Log</h2>
-        </div>
-        <div class="module-content">
-            <ul>
-                <li><a href="activity_log.php">View Activity Log</a></li>
-            </ul>
-        </div>
-    </div>
 
 </div>
 
