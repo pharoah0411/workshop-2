@@ -3,11 +3,14 @@ session_start();
 require_once 'connection.php';
 
 // Security: Only allow Admins
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-strtolower($_SESSION['role']) !== 'admin') {
+if (
+    !isset($_SESSION['user_id']) ||
+    strtolower($_SESSION['role']) !== 'admin'
+) {
     header('Location: dashboard.php');
     exit;
 }
+
 
 // 1. Identify which connection to use to fetch logs
 $activeConn = null;
