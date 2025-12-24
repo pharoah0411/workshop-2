@@ -44,18 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $sql = "DELETE FROM MEDICINE WHERE MEDICINE_ID = ?";
                 sqlsrv_query($conn, $sql, [$id_to_delete]);
             }
-            
-            // --- 3. LOG THE ACTION TO AUDIT TRAIL ---
-            // We use whichever connection is available to write the log
-            $activeConnForAudit = $pdo ?? $mysql_conn2 ?? $pg_conn;
-            if ($activeConnForAudit) {
-                logAudit(
-                    $activeConnForAudit, 
-                    'DELETE', 
-                    'Inventory', 
-                    "Deleted medicine record with ID: " . $id_to_delete
-                );
-            }
+
         } catch (Exception $e) { /* Ignore errors */ }
     }
     header('Location: medDirectory.php');
