@@ -127,7 +127,7 @@ $username = $_SESSION['username'] ?? 'User';
 
             <div style="display: flex; gap; 10px;">
                 <?php if(strtolower($userRole) === 'admin'): ?>
-                    <a href="audit.php" class="btn" style="background: #0066ff; color: white;">🛡️ Audit Trail</a>
+                    <a href="view_audit.php" class="btn" style="background: #0066ff; color: white;">🛡️ Audit Trail</a>
                 <?php endif; ?>
          
                 <a href="logout.php" class="btn btn-secondary">Log Out</a>
