@@ -1,5 +1,20 @@
 <?php
 session_start();
+require_once 'connection.php';
+require_once 'audit.php'; // 
+
+// ... some code to handle the form ...
+
+if ($query_executed_successfully) { 
+    
+    // <--- PLACE LOG HERE (Inside the success brackets)
+    logAudit($activeConn, 'ADD', 'Inventory', 'Added medicine: ' . $medicineName);
+    
+    echo "Medicine added successfully!";
+} else {
+    // Do NOT place the log here, or it will record actions that failed
+}
+?>
 
 // Authentication Check
 if (!isset($_SESSION['user_id'])) {
@@ -9,8 +24,6 @@ if (!isset($_SESSION['user_id'])) {
 
 $userRole = $_SESSION['role'] ?? 'Pharmacist';
 $username = $_SESSION['username'] ?? 'User';
-
-require_once 'connection.php';
 
 // --- Connection Status ---
 $status_mysql2 = (isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) ? "✅ Connected" : "❌ Failed";
