@@ -190,5 +190,5 @@ $username = $_SESSION['username'] ?? 'User';
 
         </section>
     </div>
-<body>
+</body>
 </html>
