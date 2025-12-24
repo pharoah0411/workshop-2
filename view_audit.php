@@ -4,6 +4,7 @@ require_once 'connection.php';
 
 // Security: Only allow Admins
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+strtolower($_SESSION['role']) !== 'admin') {
     header('Location: dashboard.php');
     exit;
 }
