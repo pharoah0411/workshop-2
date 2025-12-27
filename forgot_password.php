@@ -37,9 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($username) {
-            $_SESSION['reset_user'] = $username;
-            header("Location: reset_password.php");
+            if ($username) {header("Location: reset_password.php?email=" . urlencode($email));
             exit;
+}
+
         } else {
             $error = "Email address not found.";
         }
