@@ -23,6 +23,8 @@ $DAYS_EXPIRING_SOON = 30;
 // --- 1. Handle Deletion (FIXED TABLE NAME) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete' && isset($_POST['id'])) {
     $id_to_delete = intval($_POST['id']);
+    $deleted = false;
+    
     if ($id_to_delete > 0) {
         try {
             // MySQL 2 (Fixed: MEDICINE)
@@ -36,27 +38,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $stmt = $pg_conn->prepare("DELETE FROM MEDICINE WHERE MEDICINE_ID = :id");
                 $stmt->execute([':id' => $id_to_delete]);
             } 
-            // SQL Server (Fixed: MEDICINE)
+            // SQL Server (MEDICINE)
             if (isset($pdo) && $pdo instanceof PDO) {
-                $stmt = $pdo->prepare("DELETE FROM MEDICINE WHERE MEDICINE_ID = :id");
-                $stmt->execute([':id' => $id_to_delete]);
-            } elseif (isset($conn) && $conn !== false) {
-                $sql = "DELETE FROM MEDICINE WHERE MEDICINE_ID = ?";
-                sqlsrv_query($conn, $sql, [$id_to_delete]);
+            $stmt = $pdo->prepare("DELETE FROM MEDICINE WHERE MEDICINE_ID = :id");
+            $stmt->execute([':id' => $id_to_delete]);
+
+            if ($stmt->rowCount() > 0) {
+                $deleted = true;
             }
-            
-            // --- 3. LOG THE ACTION TO AUDIT TRAIL ---
-            // We use whichever connection is available to write the log
-            $activeConnForAudit = $pdo ?? $mysql_conn2 ?? $pg_conn;
-            if ($activeConnForAudit) {
-                logAudit(
-                    $activeConnForAudit, 
-                    'DELETE', 
-                    'Inventory', 
-                    "Deleted medicine record with ID: " . $id_to_delete
-                );
-            }
+        }
+
         } catch (Exception $e) { /* Ignore errors */ }
+    }
+         // PostgreSQL audit trail (centralized)
+        if ($deleted && isset($pg_conn) && $pg_conn instanceof PDO) {
+            logAudit(
+            $pg_conn,
+            'DELETE',
+            'Medicine',
+            "Deleted medicine ID: $id_to_delete"
+        );
     }
     header('Location: medDirectory.php');
     exit;
