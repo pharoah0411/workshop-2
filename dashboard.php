@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once "session_check.php";   // ✅ auto logout + login check
 require_once 'connection.php';
 
 // Check if user is NOT logged in. If not, redirect to login page.
