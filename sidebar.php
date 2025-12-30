@@ -13,5 +13,4 @@
 
     <!-- Permissions / Logs -->
     <a href="permissions.php">Role Permissions</a>
-    <a href="activity_log.php">Activity Log</a>
 </div>

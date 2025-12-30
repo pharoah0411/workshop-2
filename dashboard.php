@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once "session_check.php";   // ✅ auto logout + login check
 require_once 'connection.php';
 
 // Check if user is NOT logged in. If not, redirect to login page.
@@ -124,8 +124,15 @@ $username = $_SESSION['username'] ?? 'User';
     <div class="container">
         <div class="controls-top">
             <span>Logged in as: **<?php echo htmlspecialchars($username); ?>** (Role: **<?php echo htmlspecialchars($userRole); ?>**)</span>
-            <a href="logout.php" class="btn btn-secondary">Log Out</a>
-        </div>
+
+            <div style="display: flex; gap; 10px;">
+                <?php if(strtolower($userRole) === 'admin'): ?>
+                    <a href="view_audit.php" class="btn" style="background: #0066ff; color: white;">🛡️ Audit Trail</a>
+                <?php endif; ?>
+         
+                <a href="logout.php" class="btn btn-secondary">Log Out</a>
+            </div>
+                </div>
         
         <header class="header">
             <div class="header-content">
@@ -173,6 +180,7 @@ $username = $_SESSION['username'] ?? 'User';
             </div>
 
              <div class="module-card">
+<<<<<<< HEAD
     <div class="module-header"><h2>📈 Reports & Analytics</h2></div>
     <div class="module-content">
         <ul>
@@ -180,6 +188,15 @@ $username = $_SESSION['username'] ?? 'User';
         </ul>
     </div>
 </div>
+=======
+                <div class="module-header"><h2>📈 Reports & Analytics</h2></div>
+                <div class="module-content">
+                    <ul>
+                        <li><a href="reports.php">Report Dashboard (Future Page)</a></li>
+                    </ul>
+                </div>
+            </div>
+>>>>>>> 48019c664dc8d44529b1e353fa35d58a2cacda34
 
         </section>
     </div>

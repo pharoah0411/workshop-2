@@ -1,121 +1,156 @@
 <?php
-include "connection.php"; 
+require_once "auth_check.php";   // ⬅ MUST BE FIRST
+requireRole('admin');            // ⬅ BLOCK non-admins
+include "connection.php";
 include "header.php";
 
 $message = "";
 
-// Handle form submission
+/* =========================
+   STRONG PASSWORD CHECK (SERVER)
+========================= */
+function isStrongPassword($password) {
+    return preg_match(
+        '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/',
+        $password
+    );
+}
+
+/* =========================
+   HANDLE FORM SUBMISSION
+========================= */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $username = trim($_POST['username']);
     $password = trim($_POST['password']);
-    $role = trim($_POST['role']);
-    $name = trim($_POST['name']);
-    $email = trim($_POST['email']);
-    $phone = trim($_POST['phone']);
-    
-    // Get the selected target database
-    $target_source = $_POST['source'] ?? 'Postgres'; 
+    $role     = trim($_POST['role']);
+    $name     = trim($_POST['name']);
+    $email    = trim($_POST['email']);
+    $phone    = trim($_POST['phone']);
+    $target_source = $_POST['source'] ?? 'Postgres';
 
-    if ($username === '' || $password === '' || $name === '' || $email === '' || $phone === '' || $role === '') {
-        $message = "<div class='alert alert-danger'>ERROR: All fields are required.</div>";
+    if ($username === '' || $password === '' || $role === '' ||
+        $name === '' || $email === '' || $phone === '') {
+
+        $message = "<div style='color:red; padding:10px;'>❌ All fields are required.</div>";
+
+    } elseif (!isStrongPassword($password)) {
+
+        $message = "<div style='color:red; padding:10px;'>
+            ❌ Password does not meet security requirements.
+        </div>";
+
     } else {
+
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+
         $success_count = 0;
         $attempt_count = 0;
-        $errors = []; // Array to store specific errors
+        $errors = [];
 
-        // Base SQL
-        $sql = 'INSERT INTO "user" (username, password, role, name, email, phone) VALUES (:u, :p, :r, :n, :e, :ph)';
-        
-        // --- 1. MySQL #2 INSERT ---
-        if ($target_source === 'All' || $target_source === 'MySQL') {
-            if (isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
+        /* =========================
+           POSTGRESQL
+        ========================= */
+        if ($target_source === 'Postgres' || $target_source === 'All') {
+            if ($pg_conn instanceof PDO) {
                 $attempt_count++;
                 try {
-                    $m_sql = str_replace('"', '`', $sql);
-                    $m_sql = str_replace(':u', '?', $m_sql);
-                    // Replace other params with ? manually or use a helper logic. 
-                    // Simpler regex for quick replacement of all :param to ?
-                    $m_sql = preg_replace('/:[a-z]+/', '?', $m_sql);
+                    $stmt = $pg_conn->prepare(
+                        'INSERT INTO "user"
+                        (username, password, role, name, email, phone)
+                        VALUES (:u, :p, :r, :n, :e, :ph)'
+                    );
 
-                    $stmt = $mysql_conn2->prepare($m_sql);
-                    if (!$stmt) {
-                        throw new Exception("MySQL Prepare failed: " . $mysql_conn2->error);
-                    }
-                    $stmt->bind_param("ssssss", $username, $password, $role, $name, $email, $phone);
-                    if ($stmt->execute()) {
-                        $success_count++;
-                    } else {
-                        throw new Exception($stmt->error);
-                    }
+                    $stmt->execute([
+                        ':u'  => $username,
+                        ':p'  => $hashedPassword,
+                        ':r'  => $role,
+                        ':n'  => $name,
+                        ':e'  => $email,
+                        ':ph' => $phone
+                    ]);
+
+                    $success_count++;
+                } catch (PDOException $e) {
+                    $errors[] = "Postgres: " . $e->getMessage();
+                }
+            }
+        }
+
+        /* =========================
+           MYSQL
+        ========================= */
+        if ($target_source === 'MySQL' || $target_source === 'All') {
+            if ($mysql_conn2 instanceof mysqli) {
+                $attempt_count++;
+                try {
+                    $stmt = $mysql_conn2->prepare(
+                        "INSERT INTO `USER`
+                        (USERNAME, PASSWORD, ROLE, NAME, EMAIL, PHONE)
+                        VALUES (?, ?, ?, ?, ?, ?)"
+                    );
+
+                    $stmt->bind_param(
+                        "ssssss",
+                        $username,
+                        $hashedPassword,
+                        $role,
+                        $name,
+                        $email,
+                        $phone
+                    );
+
+                    $stmt->execute();
                     $stmt->close();
-                } catch (Exception $e) { 
-                    $errors[] = "MySQL Error: " . $e->getMessage(); 
+                    $success_count++;
+
+                } catch (Exception $e) {
+                    $errors[] = "MySQL: " . $e->getMessage();
                 }
-            } else {
-                $errors[] = "MySQL: Connection not available.";
             }
         }
 
-        // --- 2. PostgreSQL INSERT ---
-        if ($target_source === 'All' || $target_source === 'Postgres') {
-            if (isset($pg_conn) && $pg_conn instanceof PDO) {
+        /* =========================
+           SQL SERVER
+        ========================= */
+        if ($target_source === 'SQLServer' || $target_source === 'All') {
+            if ($pdo instanceof PDO) {
                 $attempt_count++;
                 try {
-                    $stmt = $pg_conn->prepare($sql);
-                    if ($stmt->execute([':u'=>$username, ':p'=>$password, ':r'=>$role, ':n'=>$name, ':e'=>$email, ':ph'=>$phone])) {
-                        $success_count++;
-                    }
-                } catch (PDOException $e) { 
-                    // Check for duplicate key
-                    if ($e->getCode() == 23505) {
-                        $errors[] = "Postgres Error: Username '$username' already exists.";
-                    } else {
-                        $errors[] = "Postgres Error: " . $e->getMessage(); 
-                    }
+                    $stmt = $pdo->prepare(
+                        "INSERT INTO [USER]
+                        (username, password, role, name, email, phone)
+                        VALUES (?, ?, ?, ?, ?, ?)"
+                    );
+
+                    $stmt->execute([
+                        $username,
+                        $hashedPassword,
+                        $role,
+                        $name,
+                        $email,
+                        $phone
+                    ]);
+
+                    $success_count++;
+
+                } catch (Exception $e) {
+                    $errors[] = "SQL Server: " . $e->getMessage();
                 }
-            } else {
-                $errors[] = "Postgres: Connection not available (Check VPN/Network).";
             }
         }
-        
-        // --- 3. SQL Server INSERT ---
-        if ($target_source === 'All' || $target_source === 'SQLServer') {
-            if ((isset($pdo) && $pdo instanceof PDO) || (isset($conn) && $conn !== false)) {
-                $attempt_count++;
-                try {
-                    // SQL Server uses brackets for reserved word [USER]
-                    $s_sql = str_replace('"user"', '[USER]', $sql); 
-                    
-                    if (isset($pdo) && $pdo instanceof PDO) {
-                        $stmt = $pdo->prepare($s_sql);
-                        if ($stmt->execute([':u'=>$username, ':p'=>$password, ':r'=>$role, ':n'=>$name, ':e'=>$email, ':ph'=>$phone])) {
-                            $success_count++;
-                        }
-                    } elseif (isset($conn) && $conn !== false) {
-                        $sql_legacy = "INSERT INTO [USER] (username, password, role, name, email, phone) VALUES (?, ?, ?, ?, ?, ?)";
-                        $params = [$username, $password, $role, $name, $email, $phone];
-                        if (sqlsrv_query($conn, $sql_legacy, $params)) {
-                            $success_count++;
-                        } else {
-                            $errors[] = "SQL Server Error: " . print_r(sqlsrv_errors(), true);
-                        }
-                    }
-                } catch (PDOException $e) { 
-                    $errors[] = "SQL Server Error: " . $e->getMessage(); 
-                }
-            } else {
-                $errors[] = "SQL Server: Connection not available.";
-            }
-        }
-        
-        // --- FINAL STATUS MESSAGE ---
+
+        /* =========================
+           FINAL MESSAGE
+        ========================= */
         if ($success_count > 0) {
-            $message = "<div class='alert alert-success' style='color:green; font-weight:bold; padding:10px; border:1px solid green; background:#d4edda;'>✅ User added successfully to $success_count out of $attempt_count database(s)!</div>";
+            $message = "<div style='color:green; padding:10px;'>
+                ✅ User added successfully to $success_count database(s).
+            </div>";
         } else {
-            // Display ALL collected errors
-            $error_html = implode("<br>", $errors);
-            $message = "<div class='alert alert-danger' style='color:red; padding:10px; border:1px solid red; background:#f8d7da;'>❌ FAILED to add user.<br><strong>Debug Info:</strong><br>$error_html</div>";
+            $message = "<div style='color:red; padding:10px;'>
+                ❌ Failed to add user.<br>" . implode("<br>", $errors) . "
+            </div>";
         }
     }
 }
@@ -125,63 +160,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <?= $message ?>
 
-<form method="POST" 
-      style="background:white; padding:20px; border-radius:10px; width:600px;">
+<form method="POST" style="background:white; padding:20px; border-radius:10px; width:600px;">
 
-    <div class="form-group">
-        <label><strong>Save to Database:</strong></label><br>
-        <select name="source" class="input-box" required>
-            <option value="Postgres" selected>Postgres Only</option>
-            <option value="MySQL">MySQL Only</option>
-            <option value="SQLServer">SQL Server Only</option>
-            <option value="All">All Databases</option>
-        </select>
-        <br><br>
+    <label>Save to Database</label>
+    <select name="source" class="input-box" required>
+        <option value="Postgres">Postgres</option>
+        <option value="MySQL">MySQL</option>
+        <option value="SQLServer">SQL Server</option>
+        <option value="All">All</option>
+    </select><br><br>
+
+    <label>Username</label>
+    <input name="username" class="input-box" required><br><br>
+
+    <label>Password</label>
+    <input type="password" name="password" id="password"
+           class="input-box" onkeyup="checkPasswordStrength()" required>
+
+    <!-- PASSWORD RULES -->
+    <div id="password-rules" style="margin-top:10px; font-size:14px;">
+        <p id="length">❌ At least 8 characters</p>
+        <p id="uppercase">❌ At least 1 uppercase letter</p>
+        <p id="lowercase">❌ At least 1 lowercase letter</p>
+        <p id="number">❌ At least 1 number</p>
+        <p id="special">❌ At least 1 special character (@$!%*?&)</p>
     </div>
-    <label><strong>Username:</strong></label><br>
-    <input type="text" name="username" required class="input-box"><br><br>
+    <br>
 
-    <label><strong>Password:</strong></label><br>
-    <input type="password" name="password" required class="input-box"><br><br>
-
-    <label><strong>Role:</strong></label><br>
+    <label>Role</label>
     <select name="role" class="input-box" required>
-        <option value="">Select role...</option>
+        <option value="">Select role</option>
         <option value="admin">Admin</option>
         <option value="pharmacist">Pharmacist</option>
-    </select>
-    <br><br>
+    </select><br><br>
 
-    <label><strong>Full Name:</strong></label><br>
-    <input type="text" name="name" required class="input-box"><br><br>
+    <label>Full Name</label>
+    <input name="name" class="input-box" required><br><br>
 
-    <label><strong>Email:</strong></label><br>
-    <input type="email" name="email" required class="input-box"><br><br>
+    <label>Email</label>
+    <input type="email" name="email" class="input-box" required><br><br>
 
-    <label><strong>Phone:</strong></label><br>
-    <input type="text" name="phone" required class="input-box"><br><br>
+    <label>Phone</label>
+    <input name="phone" class="input-box" required><br><br>
 
-    <button type="submit" 
-            style="padding:10px 20px; background:#0b2f6d; color:white; border:0; border-radius:5px; cursor:pointer;">
+    <button type="submit"
+        id="submitBtn"
+        disabled
+        style="background:#999; color:white; padding:10px 20px; border:0; cursor:not-allowed;">
         Add User
     </button>
 
-    <a href="user_list.php" 
-       style="padding:10px 20px; background:#999; color:white; border-radius:5px; margin-left:10px; text-decoration:none;">
-        Cancel
-    </a>
-
+    <a href="user_list.php" style="margin-left:10px;">Cancel</a>
 </form>
 
 <style>
 .input-box {
-    width: 100%;
-    padding: 10px;
-    margin-top: 5px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
+    width:100%;
+    padding:10px;
+    border-radius:5px;
+    border:1px solid #ccc;
 }
 </style>
 
-</div> </body>
-</html>
+<script>
+function checkPasswordStrength() {
+    const password = document.getElementById("password").value;
+    const submitBtn = document.getElementById("submitBtn");
+
+    const rules = {
+        length: password.length >= 8,
+        uppercase: /[A-Z]/.test(password),
+        lowercase: /[a-z]/.test(password),
+        number: /\d/.test(password),
+        special: /[@$!%*?&]/.test(password)
+    };
+
+    for (let rule in rules) {
+        document.getElementById(rule).style.color = rules[rule] ? "green" : "red";
+        document.getElementById(rule).innerHTML =
+            (rules[rule] ? "✅ " : "❌ ") + document.getElementById(rule).innerText.slice(2);
+    }
+
+    if (Object.values(rules).every(Boolean)) {
+        submitBtn.disabled = false;
+        submitBtn.style.background = "#0b2f6d";
+        submitBtn.style.cursor = "pointer";
+    } else {
+        submitBtn.disabled = true;
+        submitBtn.style.background = "#999";
+        submitBtn.style.cursor = "not-allowed";
+    }
+}
+</script>

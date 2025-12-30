@@ -1,4 +1,6 @@
 <?php
+require_once "auth_check.php";   // ⬅ MUST BE FIRST
+requireRole('admin');            // ⬅ BLOCK non-admins
 include "header.php";
 
 // Permission settings (editable from UI)
