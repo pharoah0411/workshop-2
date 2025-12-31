@@ -1,29 +1,97 @@
 <?php
-require_once "auth_check.php";   // ⬅ MUST BE FIRST
-requireRole('admin');            // ⬅ BLOCK non-admins
-include "connectionSyameel.php";
+require_once "auth_check.php";   // MUST BE FIRST
+requireRole('admin');            // admin only
+
+require_once "connection.php";
 include "header.php";
 
 $message = "";
 
-// 1️⃣ Validate user ID
-if (!isset($_GET['id'])) {
-    die("<p style='color:red;'>No user selected.</p>");
+/* =========================
+   1) VALIDATE INPUT
+========================= */
+if (!isset($_GET['id']) || !isset($_GET['db'])) {
+    die("<p style='color:red;'>Missing user ID or source.</p>");
 }
 
-$user_id = $_GET['id'];
+$user_id = trim($_GET['id']);
+$db      = trim($_GET['db']);
 
-// 2️⃣ Fetch user data
-$sql = 'SELECT * FROM "user" WHERE user_id = :id';
-$stmt = $conn->prepare($sql);
-$stmt->execute([':id' => $user_id]);
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
+// Normalize db name (accept SQL%20Server, sqlserver, etc.)
+$dbKey = strtolower(str_replace(' ', '', $db));
+if ($dbKey === 'postgres' || $dbKey === 'postgresql') $dbKey = 'postgres';
+elseif ($dbKey === 'mysql') $dbKey = 'mysql';
+elseif ($dbKey === 'sqlserver' || $dbKey === 'mssql') $dbKey = 'sqlserver';
+else die("<p style='color:red;'>Invalid database source.</p>");
+
+/* =========================
+   2) FETCH USER BY DB
+========================= */
+$user = null;
+
+try {
+    if ($dbKey === 'postgres') {
+
+        if (!($pg_conn instanceof PDO)) die("<p style='color:red;'>Postgres connection not available.</p>");
+
+        $stmt = $pg_conn->prepare('SELECT user_id, username, name, email, phone, role FROM "user" WHERE user_id = :id');
+        $stmt->execute([':id' => $user_id]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    } elseif ($dbKey === 'mysql') {
+
+        if (!($mysql_conn2 instanceof mysqli)) die("<p style='color:red;'>MySQL connection not available.</p>");
+
+        $stmt = $mysql_conn2->prepare("SELECT USER_ID, USERNAME, NAME, EMAIL, PHONE, ROLE FROM `USER` WHERE USER_ID = ?");
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $user = $res->fetch_assoc();
+        $stmt->close();
+
+        // Normalize keys to match Postgres style
+        if ($user) {
+            $user = [
+                'user_id'   => $user['USER_ID'],
+                'username'  => $user['USERNAME'],
+                'name'      => $user['NAME'],
+                'email'     => $user['EMAIL'],
+                'phone'     => $user['PHONE'],
+                'role'      => $user['ROLE'],
+            ];
+        }
+
+    } elseif ($dbKey === 'sqlserver') {
+
+        if (!($pdo instanceof PDO)) die("<p style='color:red;'>SQL Server connection not available.</p>");
+
+        $stmt = $pdo->prepare("SELECT USER_ID, username, name, email, phone, role FROM [USER] WHERE USER_ID = ?");
+        $stmt->execute([$user_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($row) {
+            $user = [
+                'user_id'   => $row['USER_ID'],
+                'username'  => $row['username'],
+                'name'      => $row['name'],
+                'email'     => $row['email'],
+                'phone'     => $row['phone'],
+                'role'      => $row['role'],
+            ];
+        }
+    }
+
+} catch (Exception $e) {
+    die("<p style='color:red;'>Error fetching user: " . htmlspecialchars($e->getMessage()) . "</p>");
+}
 
 if (!$user) {
-    die("<p style='color:red;'>User not found.</p>");
+    die("<p style='color:red;'>User not found in selected database.</p>");
 }
 
-// 3️⃣ Handle form submission (NO PASSWORD LOGIC)
+/* =========================
+   3) HANDLE UPDATE
+========================= */
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     $username = trim($_POST["username"]);
@@ -33,40 +101,59 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $role     = trim($_POST["role"]);
 
     try {
-        $sqlUpdate = '
-            UPDATE "user"
-            SET username = :u,
-                name     = :n,
-                email    = :e,
-                phone    = :ph,
-                role     = :r
-            WHERE user_id = :id
-        ';
+        if ($dbKey === 'postgres') {
 
-        $stmtUp = $conn->prepare($sqlUpdate);
-        $stmtUp->execute([
-            ':u'  => $username,
-            ':n'  => $name,
-            ':e'  => $email,
-            ':ph' => $phone,
-            ':r'  => $role,
-            ':id' => $user_id
-        ]);
+            $stmt = $pg_conn->prepare('
+                UPDATE "user"
+                SET username = :u, name = :n, email = :e, phone = :ph, role = :r
+                WHERE user_id = :id
+            ');
+            $stmt->execute([
+                ':u'  => $username,
+                ':n'  => $name,
+                ':e'  => $email,
+                ':ph' => $phone,
+                ':r'  => $role,
+                ':id' => $user_id
+            ]);
 
-        $message = "<p style='color:green;'>✅ User updated successfully!</p>";
+        } elseif ($dbKey === 'mysql') {
 
-        // Reload updated data
-        $stmt->execute([':id' => $user_id]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stmt = $mysql_conn2->prepare("
+                UPDATE `USER`
+                SET USERNAME = ?, NAME = ?, EMAIL = ?, PHONE = ?, ROLE = ?
+                WHERE USER_ID = ?
+            ");
+            $stmt->bind_param("sssssi", $username, $name, $email, $phone, $role, $user_id);
+            $stmt->execute();
+            $stmt->close();
 
-    } catch (PDOException $e) {
+        } elseif ($dbKey === 'sqlserver') {
+
+            $stmt = $pdo->prepare("
+                UPDATE [USER]
+                SET username = ?, name = ?, email = ?, phone = ?, role = ?
+                WHERE USER_ID = ?
+            ");
+            $stmt->execute([$username, $name, $email, $phone, $role, $user_id]);
+        }
+
+        $message = "<p style='color:green;'>✅ User updated successfully ($db).</p>";
+
+        // Refresh displayed data
+        $user['username'] = $username;
+        $user['name']     = $name;
+        $user['email']    = $email;
+        $user['phone']    = $phone;
+        $user['role']     = $role;
+
+    } catch (Exception $e) {
         $message = "<p style='color:red;'>ERROR: " . htmlspecialchars($e->getMessage()) . "</p>";
     }
 }
 ?>
 
-<h1>Edit User</h1>
-
+<h1>Edit User (<?= htmlspecialchars($db) ?>)</h1>
 <?= $message ?>
 
 <form method="POST"
@@ -94,31 +181,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <label><strong>Role:</strong></label><br>
     <select name="role" class="input-box" required>
-        <option value="admin" <?= $user['role'] === 'admin' ? 'selected' : '' ?>>
-            Admin
-        </option>
-        <option value="pharmacist" <?= $user['role'] === 'pharmacist' ? 'selected' : '' ?>>
-            Pharmacist
-        </option>
+        <option value="admin" <?= ($user['role'] === 'admin') ? 'selected' : '' ?>>Admin</option>
+        <option value="pharmacist" <?= ($user['role'] === 'pharmacist') ? 'selected' : '' ?>>Pharmacist</option>
     </select>
     <br><br>
 
     <button type="submit"
-            style="padding:10px 20px;
-                   background:#0b2f6d;
-                   color:white;
-                   border:0;
-                   border-radius:5px;">
+            style="padding:10px 20px; background:#0b2f6d; color:white; border:0; border-radius:5px;">
         Save Changes
     </button>
 
     <a href="user_list.php"
-       style="padding:10px 20px;
-              background:#999;
-              color:white;
-              border-radius:5px;
-              margin-left:10px;
-              text-decoration:none;">
+       style="padding:10px 20px; background:#999; color:white; border-radius:5px;
+       margin-left:10px; text-decoration:none;">
         Cancel
     </a>
 </form>

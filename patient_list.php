@@ -2,75 +2,100 @@
 include "connection.php";
 include "header.php";
 
-// Fetch patients + join with user table
-// FIX: Use COALESCE to ensure NAME is always pulled, either from patient (p.name) or user (u.name).
-$sql = "
-SELECT 
-    p.patient_id,
-    u.user_id,
-    COALESCE(p.name, u.name) AS full_name, /* Get name from P if available, otherwise from U */
-    p.gender,
-    p.dob,
-    p.ic_no,
-    p.address,
-    (
-        SELECT COUNT(*) 
-        FROM medical_history mh 
-        WHERE mh.patient_id = p.patient_id
-    ) AS history_count
-FROM patient p
-JOIN \"user\" u ON p.user_id = u.user_id
-ORDER BY p.patient_id ASC
-";
+$all_patients = [];
 
-// Assuming $pg_conn is the PostgreSQL connection object established in connection.php
-$stmt = $pg_conn->query($sql);
-$patients = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// 1. Fetch from PostgreSQL
+if (isset($pg_conn)) {
+    try {
+        // We use COALESCE just in case some old records still have names in the user table
+        $sql = "SELECT p.patient_id, COALESCE(p.name, u.name) AS full_name, p.gender, p.dob, p.ic_no, p.address 
+                FROM patient p 
+                LEFT JOIN \"user\" u ON p.user_id = u.user_id 
+                ORDER BY p.patient_id ASC";
+        $stmt = $pg_conn->query($sql);
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $row['source'] = 'Postgres';
+            $all_patients[] = $row;
+        }
+    } catch (Exception $e) { /* Connection failed or table missing */ }
+}
+
+// 2. Fetch from MySQL
+if (isset($mysql_conn2)) {
+    try {
+        $sql = "SELECT p.patient_id, p.name AS full_name, p.gender, p.dob, p.ic_no, p.address 
+                FROM patient p 
+                ORDER BY p.patient_id ASC";
+        $result = $mysql_conn2->query($sql);
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $row['source'] = 'MySQL';
+                $all_patients[] = $row;
+            }
+        }
+    } catch (Exception $e) { }
+}
+
+// 3. Fetch from SQL Server
+if (isset($pdo)) {
+    try {
+        $sql = "SELECT p.patient_id, p.name AS full_name, p.gender, p.dob, p.ic_no, p.address 
+                FROM patient p 
+                ORDER BY p.patient_id ASC";
+        $stmt = $pdo->query($sql);
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $row['source'] = 'SQL Server';
+            $all_patients[] = $row;
+        }
+    } catch (Exception $e) { }
+}
 ?>
 
-<h1>Patient List</h1>
+<h1>Patient List (Multi-Database)</h1>
 
-<a href="add_patient.php" 
-    style="padding: 10px 15px; background: #28a745; color: white; 
-           border-radius: 5px; text-decoration: none;">
+<a href="add_patient.php" style="padding: 10px 15px; background: #28a745; color: white; border-radius: 5px; text-decoration: none;">
     + Add Patient
 </a>
 
 <br><br>
 
-<table border="0" cellpadding="10" cellspacing="0" 
-       style="width: 100%; background:white; border-radius:10px;">
-    
-    <tr style="background:#0b2f6d; color:white;">
+<table border="0" cellpadding="10" cellspacing="0" style="width: 100%; background:white; border-radius:10px;">
+    <tr style="background:linear-gradient(135deg, #0066ff 0%, #0099ff 100%); color:white;">
+        <th>Source</th>
         <th>ID</th>
         <th>Full Name</th>
         <th>Gender</th>
         <th>DOB</th>
-        <th>History</th>
+        <th>IC No</th>
         <th>Actions</th>
     </tr>
 
-    <?php foreach($patients as $p): ?>
-    <tr style="border-bottom:1px solid #ccc;">
-        <td><?= $p['patient_id'] ?></td>
-        <td><?= htmlspecialchars($p['full_name']) ?></td> 
-        <td><?= $p['gender'] ?></td>
-        <td><?= $p['dob'] ?></td>
-        <td><?= $p['history_count'] ?> record(s)</td>
+    <?php if (empty($all_patients)): ?>
+        <tr><td colspan="7" style="text-align:center;">No patients found in any database.</td></tr>
+    <?php else: ?>
+        <?php foreach($all_patients as $p): ?>
+        <tr style="border-bottom:1px solid #ccc;">
+            <td style="font-size: 0.8em; color: #666;"><strong><?= $p['source'] ?></strong></td>
+            <td><?= $p['patient_id'] ?></td>
+            <td><?= htmlspecialchars($p['full_name'] ?? 'N/A') ?></td>
+            <td><?= $p['gender'] ?></td>
+            <td><?= $p['dob'] ?></td>
+            <td><?= htmlspecialchars($p['ic_no'] ?? '') ?></td>
 
-        <td>
-            <a href="edit_patient.php?id=<?= $p['patient_id'] ?>" 
-               style="color:blue; margin-right:10px;">Edit</a>
+            <td>
+                <a href="edit_patient.php?id=<?= $p['patient_id'] ?>&db=<?= $p['source'] ?>" 
+                   style="color:blue; margin-right:10px;">Edit</a>
 
-            <a href="patient_history.php?id=<?= $p['patient_id'] ?>" 
-               style="color:green; margin-right:10px;">History</a>
+                <a href="patient_history.php?id=<?= $p['patient_id'] ?>&db=<?= $p['source'] ?>" 
+                   style="color:green; margin-right:10px;">History</a>
 
-            <a href="delete_patient.php?id=<?= $p['patient_id'] ?>" 
-               onclick="return confirm('Delete this patient?');"
-               style="color:red;">Delete</a>
-        </td>
-    </tr>
-    <?php endforeach; ?>
+                <a href="delete_patient.php?id=<?= $p['patient_id'] ?>&db=<?= $p['source'] ?>" 
+                   onclick="return confirm('Delete this patient from <?= $p['source'] ?>?');"
+                   style="color:red;">Delete</a>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+    <?php endif; ?>
 </table>
 
 </div> </body>

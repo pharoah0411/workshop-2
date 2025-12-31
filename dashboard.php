@@ -8,6 +8,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// 🔐 Logged in but forced to reset password
+if (!empty($_SESSION['force_reset'])) {
+    header("Location: reset_password.php");
+    exit;
+}
+
 $userRole = $_SESSION['role'] ?? 'Guest';
 $username = $_SESSION['username'] ?? 'User';
 ?>

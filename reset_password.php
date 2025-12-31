@@ -1,218 +1,310 @@
 <?php
-require_once "connection.php";
+require_once 'connection.php';
 session_start();
 
-$email = $_GET['email'] ?? '';
+/* =============================
+   ACCESS CONTROL
+============================= */
+if (!isset($_SESSION['user_id']) && !isset($_SESSION['reset_user'])) {
+    header("Location: login.php");
+    exit;
+}
+
 $error = '';
 $success = '';
 
-if ($email === '') {
-    $error = "Invalid reset request.";
+/* =============================
+   STRONG PASSWORD CHECK (SERVER)
+============================= */
+function isStrongPassword($password) {
+    return preg_match(
+        '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/',
+        $password
+    );
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $email !== '') {
+/* =============================
+   HANDLE PASSWORD RESET
+============================= */
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $newPassword = $_POST['password'] ?? '';
-    $confirm     = $_POST['confirm_password'] ?? '';
+    $password = $_POST['password'] ?? '';
+    $confirm  = $_POST['confirm_password'] ?? '';
 
-    // ✅ Backend strong password validation (MUST MATCH JS)
-    if (
-        strlen($newPassword) < 8 ||
-        !preg_match('/[A-Z]/', $newPassword) ||
-        !preg_match('/[a-z]/', $newPassword) ||
-        !preg_match('/[0-9]/', $newPassword) ||
-        !preg_match('/[\W]/', $newPassword)
-    ) {
-        $error = "Password does not meet security requirements.";
+    if ($password === '' || $confirm === '') {
+        $error = "All fields are required.";
     }
-    elseif ($newPassword !== $confirm) {
+    elseif ($password !== $confirm) {
         $error = "Passwords do not match.";
     }
+    elseif (!isStrongPassword($password)) {
+        $error = "Password does not meet security requirements.";
+    }
     else {
-        $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
+
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
         $updated = false;
 
         try {
-            // 1️⃣ SQL Server
-            if (!$updated && isset($pdo) && $pdo instanceof PDO) {
-                $stmt = $pdo->prepare("UPDATE [USER] SET password = ? WHERE email = ?");
-                if ($stmt->execute([$hashed, $email]) && $stmt->rowCount() > 0) {
+            /* =====================================
+               CASE A: LOGGED-IN USER (FORCED RESET)
+            ====================================== */
+            if (isset($_SESSION['user_id'])) {
+
+                $userId = $_SESSION['user_id'];
+
+                // PostgreSQL
+                if ($pg_conn instanceof PDO) {
+                    $stmt = $pg_conn->prepare(
+                        'UPDATE "user" SET password = ? WHERE user_id = ?'
+                    );
+                    $stmt->execute([$hashedPassword, $userId]);
+                    $updated = true;
+                }
+
+                // MySQL
+                if (!$updated && $mysql_conn2 instanceof mysqli) {
+                    $stmt = $mysql_conn2->prepare(
+                        "UPDATE `USER` SET PASSWORD = ? WHERE USER_ID = ?"
+                    );
+                    $stmt->bind_param("si", $hashedPassword, $userId);
+                    $stmt->execute();
+                    $updated = true;
+                }
+
+                // SQL Server
+                if (!$updated && $pdo instanceof PDO) {
+                    $stmt = $pdo->prepare(
+                        "UPDATE [USER] SET password = ? WHERE user_id = ?"
+                    );
+                    $stmt->execute([$hashedPassword, $userId]);
                     $updated = true;
                 }
             }
 
-            // 2️⃣ MySQL
-            if (!$updated && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
-                $stmt = $mysql_conn2->prepare("UPDATE `USER` SET password = ? WHERE email = ?");
-                $stmt->bind_param("ss", $hashed, $email);
-                $stmt->execute();
-                if ($stmt->affected_rows > 0) {
+            /* =====================================
+               CASE B: FORGOT PASSWORD (EMAIL FLOW)
+            ====================================== */
+            elseif (isset($_SESSION['reset_user'])) {
+
+                $username = $_SESSION['reset_user'];
+
+                // PostgreSQL
+                if ($pg_conn instanceof PDO) {
+                    $stmt = $pg_conn->prepare(
+                        'UPDATE "user" SET password = ? WHERE username = ?'
+                    );
+                    $stmt->execute([$hashedPassword, $username]);
                     $updated = true;
                 }
-                $stmt->close();
-            }
 
-            // 3️⃣ PostgreSQL
-            if (!$updated && isset($pg_conn) && $pg_conn instanceof PDO) {
-                $stmt = $pg_conn->prepare('UPDATE "user" SET password = ? WHERE email = ?');
-                $stmt->execute([$hashed, $email]);
-                if ($stmt->rowCount() > 0) {
+                // MySQL
+                if (!$updated && $mysql_conn2 instanceof mysqli) {
+                    $stmt = $mysql_conn2->prepare(
+                        "UPDATE `USER` SET PASSWORD = ? WHERE USERNAME = ?"
+                    );
+                    $stmt->bind_param("ss", $hashedPassword, $username);
+                    $stmt->execute();
+                    $updated = true;
+                }
+
+                // SQL Server
+                if (!$updated && $pdo instanceof PDO) {
+                    $stmt = $pdo->prepare(
+                        "UPDATE [USER] SET password = ? WHERE username = ?"
+                    );
+                    $stmt->execute([$hashedPassword, $username]);
                     $updated = true;
                 }
             }
 
             if ($updated) {
-                $success = "Password reset successful. You may now log in.";
+                // 🔐 CLEAR RESET FLAGS
+                unset($_SESSION['force_reset']);
+                unset($_SESSION['reset_user']);
+
+                $success = "Password updated successfully! Redirecting...";
+
+                header("refresh:2; url=login.php");
+                exit;
             } else {
-                $error = "Email not found in system.";
+                $error = "Failed to update password. Please try again.";
             }
 
         } catch (Exception $e) {
-            $error = "Reset error: " . htmlspecialchars($e->getMessage());
+            $error = "System error: " . htmlspecialchars($e->getMessage());
         }
     }
 }
 ?>
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Reset Password</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, sans-serif;
-            background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .card {
-            background: white;
-            padding: 30px;
-            width: 420px;
-            border-radius: 14px;
-            box-shadow: 0 8px 30px rgba(0,0,0,.2);
-        }
-        h2 {
-            text-align: center;
-            color: #0066ff;
-            margin-bottom: 20px;
-        }
-        .input-box {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            margin-bottom: 10px;
-        }
-        .rules {
-            font-size: 14px;
-            margin: 10px 0;
-        }
-        .rules span {
-            display: block;
-            color: red;
-        }
-        .rules span.valid {
-            color: green;
-        }
-        .btn {
-            width: 100%;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            background: #0066ff;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            margin-top: 15px;
-        }
-        .btn:disabled {
-            background: #999;
-            cursor: not-allowed;
-        }
-        .error {
-            background: #ffe0e0;
-            color: red;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 10px;
-            text-align: center;
-        }
-        .success {
-            background: #d4edda;
-            color: green;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 10px;
-            text-align: center;
-        }
-        .back {
-            text-align: center;
-            margin-top: 10px;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>Reset Password</title>
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.container {
+    max-width:420px;
+    width:100%;
+    background:white;
+    border-radius:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.2);
+    overflow:hidden;
+}
+
+.header {
+    background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%);
+    color:white;
+    padding:26px;
+    text-align:center;
+}
+
+.content {
+    padding:26px;
+}
+
+.form-group { margin-bottom:14px; }
+
+.form-group label {
+    font-weight:600;
+    margin-bottom:6px;
+    display:block;
+}
+
+.form-group input {
+    width:100%;
+    padding:12px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    font-size:1em;
+}
+
+#password-rules p {
+    font-size:13px;
+    margin-top:4px;
+}
+
+.btn-primary {
+    width:100%;
+    padding:12px;
+    background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%);
+    color:white;
+    border:none;
+    border-radius:8px;
+    font-weight:600;
+    cursor:not-allowed;
+}
+
+.btn-primary.enabled {
+    cursor:pointer;
+}
+
+.error-message {
+    background:#ffe0e0;
+    border:1px solid red;
+    color:red;
+    padding:10px;
+    border-radius:6px;
+    margin-bottom:14px;
+    text-align:center;
+    font-weight:600;
+}
+
+.success-message {
+    background:#e0ffe0;
+    border:1px solid green;
+    color:green;
+    padding:10px;
+    border-radius:6px;
+    margin-bottom:14px;
+    text-align:center;
+    font-weight:600;
+}
+</style>
 </head>
+
 <body>
+<div class="container">
+    <div class="header">
+        <h2>🔐 Reset Password</h2>
+        <p style="margin-top:6px;">You must set a new secure password</p>
+    </div>
 
-<div class="card">
-    <h2>🔒 Reset Password</h2>
+    <div class="content">
 
-    <?php if ($error): ?><div class="error"><?= $error ?></div><?php endif; ?>
-    <?php if ($success): ?><div class="success"><?= $success ?></div><?php endif; ?>
+        <?php if ($error): ?>
+            <div class="error-message"><?= $error ?></div>
+        <?php endif; ?>
 
-    <?php if (!$success): ?>
-    <form method="POST">
-        <input type="password" name="password" id="password" class="input-box" placeholder="New Password" required>
-        <input type="password" name="confirm_password" id="confirm" class="input-box" placeholder="Confirm Password" required>
+        <?php if ($success): ?>
+            <div class="success-message"><?= $success ?></div>
+        <?php endif; ?>
 
-        <div class="rules">
-            <span id="len">❌ At least 8 characters</span>
-            <span id="upper">❌ One uppercase letter</span>
-            <span id="lower">❌ One lowercase letter</span>
-            <span id="num">❌ One number</span>
-            <span id="spec">❌ One special character</span>
-            <span id="match">❌ Passwords match</span>
-        </div>
+        <form method="POST">
 
-        <button id="submitBtn" class="btn" disabled>Reset Password</button>
-    </form>
-    <?php endif; ?>
+            <div class="form-group">
+                <label>New Password</label>
+                <input type="password" name="password" id="password" onkeyup="checkPassword()" required>
+            </div>
 
-    <div class="back">
-        <a href="login.php">← Back to Login</a>
+            <div id="password-rules">
+                <p id="length">❌ At least 8 characters</p>
+                <p id="upper">❌ Uppercase letter</p>
+                <p id="lower">❌ Lowercase letter</p>
+                <p id="number">❌ Number</p>
+                <p id="special">❌ Special character</p>
+            </div>
+
+            <div class="form-group" style="margin-top:10px;">
+                <label>Confirm Password</label>
+                <input type="password" name="confirm_password" required>
+            </div>
+
+            <button id="submitBtn" class="btn-primary" disabled>
+                Reset Password
+            </button>
+
+        </form>
     </div>
 </div>
 
 <script>
-const password = document.getElementById("password");
-const confirmP = document.getElementById("confirm");
-const btn = document.getElementById("submitBtn");
-
-function validate() {
-    const val = password.value;
-
+function checkPassword() {
+    const p = document.getElementById("password").value;
     const rules = {
-        len: val.length >= 8,
-        upper: /[A-Z]/.test(val),
-        lower: /[a-z]/.test(val),
-        num: /[0-9]/.test(val),
-        spec: /[\W]/.test(val),
-        match: val === confirmP.value && val !== ''
+        length: p.length >= 8,
+        upper: /[A-Z]/.test(p),
+        lower: /[a-z]/.test(p),
+        number: /\d/.test(p),
+        special: /[@$!%*?&]/.test(p)
     };
 
-    for (let id in rules) {
-        document.getElementById(id).className = rules[id] ? "valid" : "";
-        document.getElementById(id).innerText =
-            (rules[id] ? "✔ " : "❌ ") + document.getElementById(id).innerText.replace(/^[✔❌]\s*/, '');
+    let valid = true;
+
+    for (let r in rules) {
+        const el = document.getElementById(r);
+        el.style.color = rules[r] ? "green" : "red";
+        el.innerHTML = (rules[r] ? "✅ " : "❌ ") + el.innerText.slice(2);
+        if (!rules[r]) valid = false;
     }
 
-    btn.disabled = !Object.values(rules).every(Boolean);
+    const btn = document.getElementById("submitBtn");
+    btn.disabled = !valid;
+    btn.classList.toggle("enabled", valid);
 }
-
-password.addEventListener("input", validate);
-confirmP.addEventListener("input", validate);
 </script>
-
 </body>
 </html>
