@@ -1,0 +1,6 @@
+✅ mysql Backup SUCCESS: 2025-12-31 07:37:41
+User: admin2
+File: pharmacy_backup_mysql_2025-12-31_07-37-41.sql
+Size: 4160 bytes
+Tables backed up: 5
+Total records: 23
