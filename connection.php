@@ -16,7 +16,7 @@ $conn = null;        // SQL Server (Legacy)
 // ==================================================================================
 // 1. MySQL Connection #2 (Secondary)
 // ==================================================================================
-$mysql2_servername = "127.0.0.1";  // or "localhost"
+$mysql2_servername = "10.245.156.39";  // or "localhost"
 $mysql2_username = "farah";
 $mysql2_password = "Syimazmi201.";
 $mysql2_dbname = "medicine prescription";
