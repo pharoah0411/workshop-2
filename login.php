@@ -21,19 +21,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $activeConn = null;
         $db_online_count = 0;
 
+        // DEBUG: Log start
+        error_log("=== LOGIN ATTEMPT ===");
+        error_log("Username: $username");
+        error_log("Password entered: $password");
+
         try {
             // 1. Check SQL Server (PDO)
             if (isset($pdo) && $pdo instanceof PDO) {
                 $db_online_count++;
+                error_log("SQL Server connection: ACTIVE");
                 $stmt = $pdo->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?");
                 $stmt->execute([$username]);
                 $res = $stmt->fetch(PDO::FETCH_ASSOC);
-                if ($res) { $user = array_change_key_case($res, CASE_UPPER); $activeConn = $pdo; }
+                if ($res) { 
+                    $user = array_change_key_case($res, CASE_UPPER); 
+                    $activeConn = $pdo;
+                    error_log("Found user in SQL Server");
+                }
+            } else {
+                error_log("SQL Server connection: INACTIVE");
             }
 
             // 2. Check MySQL
             if (!$user && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
                 $db_online_count++;
+                error_log("MySQL connection: ACTIVE");
                 $stmt = $mysql_conn2->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM `USER` WHERE USERNAME = ?");
                 $stmt->bind_param("s", $username);
                 $stmt->execute();
@@ -41,18 +54,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($result->num_rows > 0) {
                     $user = array_change_key_case($result->fetch_assoc(), CASE_UPPER);
                     $activeConn = $mysql_conn2;
+                    error_log("Found user in MySQL: " . $user['USERNAME']);
                 }
                 $stmt->close();
+            } else {
+                error_log("MySQL connection: " . (isset($mysql_conn2) ? 'ACTIVE' : 'INACTIVE'));
             }
 
             // 3. Check PostgreSQL
             if (!$user && isset($pg_conn) && $pg_conn instanceof PDO) {
                 $db_online_count++;
+                error_log("PostgreSQL connection: ACTIVE");
                 $stmt = $pg_conn->prepare('SELECT user_id, username, password, role FROM "user" WHERE username = ?');
                 $stmt->execute([$username]);
                 $res = $stmt->fetch(PDO::FETCH_ASSOC);
-                if ($res) { $user = array_change_key_case($res, CASE_UPPER); $activeConn = $pg_conn; }
+                if ($res) { 
+                    $user = array_change_key_case($res, CASE_UPPER); 
+                    $activeConn = $pg_conn;
+                    error_log("Found user in PostgreSQL");
+                }
+            } else {
+                error_log("PostgreSQL connection: " . (isset($pg_conn) ? 'ACTIVE' : 'INACTIVE'));
             }
+
+            error_log("Total DB connections: $db_online_count");
+            error_log("User found: " . ($user ? 'YES' : 'NO'));
 
             // --- Authentication Logic ---
             if ($db_online_count === 0) {
@@ -61,18 +87,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $storedPass = $user['PASSWORD'];
                 $authSuccess = false;
 
-                // Smart Auth: Detect if stored password is a hash or plain text
-                $passInfo = password_get_info($storedPass);
-                if ($passInfo['algo'] !== 0) {
-                    if (password_verify($password, $storedPass)) { $authSuccess = true; }
+                // DEBUG
+                error_log("Stored password: '$storedPass'");
+                error_log("Password length: " . strlen($storedPass));
+                error_log("Entered password: '$password'");
+                error_log("Entered password length: " . strlen($password));
+
+                // SIMPLIFIED AUTH - JUST DIRECT COMPARISON
+                if ($password === $storedPass) {
+                    $authSuccess = true;
+                    error_log("Password matches (direct comparison)");
                 } else {
-                    if ($password === $storedPass) { $authSuccess = true; }
+                    error_log("Password does NOT match (direct comparison)");
+                    
+                    // Try password_verify as fallback
+                    if (password_verify($password, $storedPass)) {
+                        $authSuccess = true;
+                        error_log("Password matches (password_verify)");
+                    }
                 }
 
                 if ($authSuccess) {
                     $_SESSION['user_id'] = $user['USER_ID'];
                     $_SESSION['username'] = $user['USERNAME'];
                     $_SESSION['role'] = $user['ROLE'];
+
+                    error_log("Login SUCCESS for user: " . $user['USERNAME']);
 
                     if (file_exists('audit.php')) {
                         require_once 'audit.php';
@@ -83,13 +123,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     exit;
                 } else {
                     $error = "Invalid username or password.";
+                    error_log("Login FAILED - password mismatch");
                 }
             } else {
                 $error = "Invalid username or password.";
+                error_log("Login FAILED - user not found");
             }
         } catch (Exception $e) {
             $error = 'Login error: ' . htmlspecialchars($e->getMessage());
+            error_log("Exception: " . $e->getMessage());
         }
+        
+        error_log("=== END LOGIN ATTEMPT ===");
     }
 }
 ?>
@@ -129,7 +174,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div style="text-align:center; margin-top:15px;">
         <a href="forgot_password.php"style="color:#0066ff; font-weight:600; text-decoration:none;"> Forgot Password?</a>
 </div>
-
       </form>
     </div>
   </div>
