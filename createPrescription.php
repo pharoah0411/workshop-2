@@ -1,213 +1,225 @@
 <?php
-session_start();
-require_once 'connection.php';
+include 'connection.php'; 
 
-// Authentication Check
-if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
-}
+$message = "";
+$status_type = "";
 
-$userRole = $_SESSION['role'] ?? 'Staff';
-$username = $_SESSION['username'] ?? 'User';
+// --- 1. DATA FETCHING FOR DROPDOWNS ---
+// We need to fetch patients from ALL databases to populate the dropdown
+$all_patients = [];
 
-$patients = [];
-$medicines = [];
-$error = '';
-
-// 1. Fetch Data for Dropdowns
-try {
-    // FETCH PATIENTS (Name directly from PATIENT table as requested)
-    $p_sql = "SELECT PATIENT_ID, NAME, IC_NO FROM PATIENT ORDER BY NAME";
-    
-    // FETCH MEDICINES
-    $m_sql = "SELECT MEDICINE_ID, NAME, QUANTITY_IN_STOCK FROM MEDICINE WHERE QUANTITY_IN_STOCK > 0 ORDER BY NAME";
-
-    if (isset($pdo) && $pdo instanceof PDO) {
-        $patients = $pdo->query($p_sql)->fetchAll(PDO::FETCH_ASSOC);
-        $medicines = $pdo->query($m_sql)->fetchAll(PDO::FETCH_ASSOC);
-    } elseif (isset($conn)) {
-        // Patients
-        $res_p = sqlsrv_query($conn, $p_sql);
-        if ($res_p) {
-            while ($row = sqlsrv_fetch_array($res_p, SQLSRV_FETCH_ASSOC)) $patients[] = $row;
-        }
-        // Medicines
-        $res_m = sqlsrv_query($conn, $m_sql);
-        if ($res_m) {
-            while ($row = sqlsrv_fetch_array($res_m, SQLSRV_FETCH_ASSOC)) $medicines[] = $row;
-        }
+// Fetch from MySQL
+if (isset($conn_mysql)) {
+    $res = mysqli_query($conn_mysql, "SELECT patient_id, patient_name FROM patients");
+    while($row = mysqli_fetch_assoc($res)) { 
+        $all_patients[] = ['id' => $row['patient_id'], 'name' => $row['patient_name'], 'db' => 'MySQL']; 
     }
-} catch (Exception $e) { 
-    $error = "DB Error: " . $e->getMessage(); 
 }
 
-// 2. Handle Form Submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $patient_id = intval($_POST['patient_id']);
-    $pharmacist_id = $_SESSION['user_id'];
-    $items = $_POST['meds'] ?? []; 
+// Fetch from PostgreSQL
+if (isset($conn_pg)) {
+    $res = pg_query($conn_pg, "SELECT patient_id, patient_name FROM patients");
+    while($row = pg_fetch_assoc($res)) { 
+        $all_patients[] = ['id' => $row['patient_id'], 'name' => $row['patient_name'], 'db' => 'PostgreSQL']; 
+    }
+}
 
-    if ($patient_id > 0 && !empty($items)) {
-        try {
-            // A. Insert Prescription Header
-            $lastId = 0;
-            if (isset($pdo)) {
-                $stmt = $pdo->prepare("INSERT INTO PRESCRIPTION (PATIENT_ID, PHARMACIST_ID, DATE_ISSUED, STATUS) VALUES (?, ?, GETDATE(), 'Pending')");
-                $stmt->execute([$patient_id, $pharmacist_id]);
-                // Get ID (Specific to SQL Server PDO)
-                $lastId = $pdo->lastInsertId(); 
-                if(!$lastId) $lastId = $pdo->query("SELECT @@IDENTITY")->fetchColumn();
-            } elseif (isset($conn)) {
-                $sql = "INSERT INTO PRESCRIPTION (PATIENT_ID, PHARMACIST_ID, DATE_ISSUED, STATUS) VALUES (?, ?, GETDATE(), 'Pending'); SELECT SCOPE_IDENTITY() AS id";
-                $res = sqlsrv_query($conn, $sql, [$patient_id, $pharmacist_id]);
-                if ($res === false) throw new Exception(print_r(sqlsrv_errors(), true));
-                sqlsrv_next_result($res); 
-                $row = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC);
-                $lastId = $row['id'];
-            }
+// Fetch from SQL Server
+if (isset($conn_sql)) {
+    $res = sqlsrv_query($conn_sql, "SELECT patient_id, patient_name FROM patients");
+    while($row = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC)) { 
+        $all_patients[] = ['id' => $row['patient_id'], 'name' => $row['patient_name'], 'db' => 'SQL Server']; 
+    }
+}
 
-            // B. Insert Prescription Details
-            if ($lastId) {
-                foreach ($items as $item) {
-                    $med_id = intval($item['id']);
-                    $qty = intval($item['qty']);
-                    $dose = trim($item['dose']);
-                    $instr = trim($item['instr']);
+// Fetch Medicines (Assuming they are in your SQL Server inventory)
+$medicines = [];
+if (isset($conn_sql)) {
+    $res = sqlsrv_query($conn_sql, "SELECT medicine_name FROM medicines");
+    while($row = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC)) { $medicines[] = $row['medicine_name']; }
+}
 
-                    if ($med_id > 0 && $qty > 0) {
-                        if (isset($pdo)) {
-                            $stmt = $pdo->prepare("INSERT INTO PRESCRIPTION_DETAIL (PRESCRIPTION_ID, MEDICINE_ID, DOSAGE, QUANTITY, INSTRUCTION) VALUES (?, ?, ?, ?, ?)");
-                            $stmt->execute([$lastId, $med_id, $dose, $qty, $instr]);
-                        } elseif (isset($conn)) {
-                            $sql = "INSERT INTO PRESCRIPTION_DETAIL (PRESCRIPTION_ID, MEDICINE_ID, DOSAGE, QUANTITY, INSTRUCTION) VALUES (?, ?, ?, ?, ?)";
-                            sqlsrv_query($conn, $sql, [$lastId, $med_id, $dose, $qty, $instr]);
-                        }
-                    }
-                }
-                header('Location: prescriptiondashboard.php');
-                exit;
-            }
-        } catch (Exception $e) { $error = "Failed to create prescription: " . $e->getMessage(); }
-    } else { $error = "Please select a patient and add at least one medicine."; }
+// --- 2. PROCESSING THE INSERT ---
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $patient_data = explode('|', $_POST['patient_info']); // Contains ID and Source DB
+    $p_id = $patient_data[0];
+    $p_source = $patient_data[1];
+    
+    $medicine = $_POST['medicine'];
+    $dosage = $_POST['dosage'];
+    $duration = $_POST['duration'];
+
+    $insert_sql = "INSERT INTO prescriptions (patient_id, medicine_name, dosage, duration, date_added, source_origin) 
+                   VALUES (?, ?, ?, ?, GETDATE(), ?)";
+    
+    $params = array($p_id, $medicine, $dosage, $duration, $p_source);
+    $stmt = sqlsrv_query($conn_sql, $insert_sql, $params);
+
+    if ($stmt) {
+        $message = "✅ Prescription successfully created in SQL Server!";
+        $status_type = "success";
+    } else {
+        $message = "❌ Error saving prescription.";
+        $status_type = "error";
+    }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Issue Prescription</title>
+    <title>Create Prescription | Pharmacy System</title>
     <style>
-        /* Shared CSS */
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Segoe UI', Tahoma, sans-serif; background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%); min-height:100vh; padding:20px; }
-        .container { max-width:900px; margin:0 auto; background:white; border-radius:15px; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,0.2); }
-        
-        /* Nav Bar */
-        .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 30px; background: #1565c0; color: white; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); }
-        .nav-links a { color: white; text-decoration: none; margin-left: 15px; font-weight: 500; transition: opacity 0.2s; }
-        .nav-links a:hover { opacity: 0.8; }
-        .btn-logout { padding: 6px 12px; border: 1px solid white; border-radius: 6px; background: transparent; color: white; cursor: pointer; text-decoration: none; font-size: 0.9em; }
-        .btn-logout:hover { background: rgba(255, 255, 255, 0.1); }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background-color: #e9ecef;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
 
-        .header { background:#e3f2fd; padding:20px; color:#0066ff; text-align:center; }
-        .content { padding:30px; }
-        .form-group { margin-bottom:15px; }
-        label { display:block; margin-bottom:5px; font-weight:600; }
-        select, input { width:100%; padding:10px; border:1px solid #ddd; border-radius:5px; }
-        
-        /* Dynamic Row Styles */
-        .med-row { display:flex; gap:10px; margin-bottom:10px; align-items:flex-start; background:#f9f9f9; padding:10px; border-radius:5px; border:1px solid #eee; }
-        .med-row select { flex:2; }
-        .med-row input { flex:1; }
-        .remove-row { color:red; cursor:pointer; font-weight:bold; padding-top:10px; font-size:1.2em; }
-        
-        .btn { padding:12px 20px; background:#28a745; color:white; border:none; border-radius:5px; cursor:pointer; font-size:1em; font-weight:600; }
-        .btn-add { background:#0066ff; margin-bottom:20px; width:100%; }
-        .btn-cancel { background:#6c757d; text-decoration:none; display:inline-block; text-align:center;}
-        .actions { display:flex; gap:10px; margin-top:20px; }
-        .actions button { flex:1; }
-        .actions a { width:auto; }
-        .error-msg { background:#f8d7da; color:#721c24; padding:10px; border-radius:5px; margin-bottom:15px; }
+        .container {
+            background: #ffffff;
+            width: 500px;
+            border-radius: 10px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+            border-top: 6px solid #008080; /* Corporate Teal */
+        }
+
+        .header {
+            padding: 25px;
+            text-align: center;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+
+        .header h2 {
+            margin: 0;
+            color: #008080;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .form-area { padding: 30px; }
+
+        .form-group { margin-bottom: 20px; }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #444;
+            font-size: 14px;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            background: #fafafa;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #008080;
+            background: #fff;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: #008080;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn-submit:hover { background: #006666; }
+
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        .footer { text-align: center; padding-bottom: 20px; }
+        .footer a { color: #008080; text-decoration: none; font-size: 13px; }
     </style>
 </head>
 <body>
-    <header class="top-nav">
-        <div class="user-info">
-            Welcome, <strong><?php echo htmlspecialchars($username); ?></strong> (<?php echo htmlspecialchars($userRole); ?>)
-        </div>
-        <div class="nav-links">
-            <a href="dashboard.php">🏠 Dashboard</a>
-            <a href="medDirectory.php">📦 Medicines</a>
-            <a href="prescriptiondashboard.php">📝 Prescriptions</a>
-            <a href="logout.php" class="btn-logout">Log Out</a>
-        </div>
-    </header>
 
-    <div class="container">
-        <div class="header">
-            <h1>➕ Issue New Prescription</h1>
-        </div>
-        <div class="content">
-            <?php if($error): ?><div class="error-msg"><?php echo $error; ?></div><?php endif; ?>
-            
-            <form method="POST">
-                <div class="form-group">
-                    <label>Select Patient:</label>
-                    <select name="patient_id" required>
-                        <option value="">-- Choose Patient --</option>
-                        <?php foreach($patients as $p): ?>
-                            <option value="<?php echo $p['PATIENT_ID']; ?>">
-                                <?php echo htmlspecialchars($p['NAME']) . " (IC: " . htmlspecialchars($p['IC_NO']) . ")"; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
-                <label>Prescription Items:</label>
-                <div id="med-container">
-                    </div>
-                
-                <button type="button" class="btn btn-add" onclick="addRow()">+ Add Medicine Item</button>
-
-                <div class="actions">
-                    <button type="submit" class="btn">Create Prescription</button>
-                    <a href="prescriptiondashboard.php" class="btn btn-cancel">Cancel</a>
-                </div>
-            </form>
-        </div>
+<div class="container">
+    <div class="header">
+        <h2>Prescription Entry</h2>
     </div>
 
-    <template id="row-template">
-        <div class="med-row">
-            <select name="meds[INDEX][id]" required>
-                <option value="">Select Medicine...</option>
-                <?php foreach($medicines as $m): ?>
-                    <option value="<?php echo $m['MEDICINE_ID']; ?>">
-                        <?php echo htmlspecialchars($m['NAME']) . " (In Stock: " . $m['QUANTITY_IN_STOCK'] . ")"; ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <input type="text" name="meds[INDEX][dose]" placeholder="Dosage (e.g. 500mg)" required>
-            <input type="number" name="meds[INDEX][qty]" placeholder="Qty" min="1" required style="max-width:80px;">
-            <input type="text" name="meds[INDEX][instr]" placeholder="Instructions (e.g. 3x Daily)" required>
-            <span class="remove-row" onclick="this.parentElement.remove()" title="Remove Item">×</span>
-        </div>
-    </template>
+    <div class="form-area">
+        <?php if ($message): ?>
+            <div class="alert <?php echo $status_type; ?>"><?php echo $message; ?></div>
+        <?php endif; ?>
 
-    <script>
-        let index = 0;
-        function addRow() {
-            const container = document.getElementById('med-container');
-            const template = document.getElementById('row-template').innerHTML;
-            const html = template.replace(/INDEX/g, index++);
-            const div = document.createElement('div');
-            div.innerHTML = html;
-            container.appendChild(div.firstElementChild);
-        }
-        // Initialize with one row
-        window.onload = addRow;
-    </script>
+        <form method="POST">
+            <div class="form-group">
+                <label>Select Patient</label>
+                <select name="patient_info" required>
+                    <option value="">-- Select Patient (All Databases) --</option>
+                    <?php foreach($all_patients as $p): ?>
+                        <option value="<?php echo $p['id'].'|'.$p['db']; ?>">
+                            <?php echo $p['name']; ?> (ID: <?php echo $p['id']; ?> - <?php echo $p['db']; ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Medicine</label>
+                <select name="medicine" required>
+                    <option value="">-- Select Medicine --</option>
+                    <?php foreach($medicines as $med): ?>
+                        <option value="<?php echo $med; ?>"><?php echo $med; ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Dosage Instructions</label>
+                <select name="dosage" required>
+                    <option value="">-- Select Dosage --</option>
+                    <option value="1x Daily (Morning)">1x Daily (Morning)</option>
+                    <option value="2x Daily (Morning & Night)">2x Daily (Morning & Night)</option>
+                    <option value="3x Daily (After Meals)">3x Daily (After Meals)</option>
+                    <option value="Every 4 Hours">Every 4 Hours</option>
+                    <option value="As Needed (SOS)">As Needed (SOS)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Duration (Days)</label>
+                <input type="number" name="duration" min="1" max="90" value="7" required>
+            </div>
+
+            <button type="submit" class="btn-submit">GENERATE PRESCRIPTION</button>
+        </form>
+    </div>
+
+    <div class="footer">
+        <a href="meddirectory.php">Back to Dashboard</a>
+    </div>
+</div>
+
 </body>
 </html>

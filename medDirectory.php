@@ -1,7 +1,10 @@
 <?php
-session_start();
+// REPLACE the top of medDirectory.php with this:
+require_once "session_check.php"; // This replaces manual session_start() and updates the timer
+require_once 'connection.php';
+require_once 'audit.php';
 
-// Authentication Check
+// Check if user is NOT logged in
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
@@ -9,6 +12,8 @@ if (!isset($_SESSION['user_id'])) {
 
 $userRole = $_SESSION['role'] ?? 'Pharmacist';
 $username = $_SESSION['username'] ?? 'User';
+
+// ... rest of your medDirectory code ...
 
 require_once 'connection.php';
 require_once 'audit.php';
@@ -40,24 +45,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             } 
             // SQL Server (MEDICINE)
             if (isset($pdo) && $pdo instanceof PDO) {
-            $stmt = $pdo->prepare("DELETE FROM MEDICINE WHERE MEDICINE_ID = :id");
-            $stmt->execute([':id' => $id_to_delete]);
+                $stmt = $pdo->prepare("DELETE FROM MEDICINE WHERE MEDICINE_ID = :id");
+                $stmt->execute([':id' => $id_to_delete]);
 
-            if ($stmt->rowCount() > 0) {
-                $deleted = true;
+                if ($stmt->rowCount() > 0) {
+                    $deleted = true;
+                }
             }
-        }
 
         } catch (Exception $e) { /* Ignore errors */ }
     }
-         // PostgreSQL audit trail (centralized)
-        if ($deleted && isset($pg_conn) && $pg_conn instanceof PDO) {
-            logAudit(
-            $pg_conn,
-            'DELETE',
-            'Medicine',
-            "Deleted medicine ID: $id_to_delete"
-        );
+    // PostgreSQL audit trail (centralized)
+    if ($deleted && isset($pg_conn) && $pg_conn instanceof PDO) {
+        logAudit($pg_conn, 'DELETE', 'Medicine', "Deleted medicine ID: $id_to_delete");
     }
     header('Location: medDirectory.php');
     exit;
@@ -116,7 +116,7 @@ try {
         if ($stmt !== false) {
             while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
                 $r = array_change_key_case($row, CASE_UPPER);
-                 if (!empty($r['EXPIRY_DATE']) && $r['EXPIRY_DATE'] instanceof DateTime) {
+                if (!empty($r['EXPIRY_DATE']) && $r['EXPIRY_DATE'] instanceof DateTime) {
                     $r['EXPIRY_DATE'] = $r['EXPIRY_DATE']->format('Y-m-d');
                 }
                 $r['minStock'] = 50;
@@ -254,19 +254,47 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
                     <div style="color:#999; font-size:0.9em; margin-bottom:10px;">ID: <?php echo $m['MEDICINE_ID']; ?></div>
                     
                     <div style="display:flex; justify-content:space-between"><span>Stock:</span> <strong><?php echo $stock; ?></strong></div>
-                    <div style="display:flex; justify-content:space-between"><span>Price:</span> <strong>$<?php echo $price; ?></strong></div>
+                    <div style="display:flex; justify-content:space-between"><span>Price:</span> <strong>RM <?php echo $price; ?></strong></div>
                     
                     <div class="<?php echo ($stock <= 50) ? 'stock-low' : 'stock-good'; ?>">
                         <?php echo ($stock <= 50) ? '⚠️ Low Stock' : '✅ In Stock'; ?>
                     </div>
                     
-                    <div style="background:#e8f5e9; padding:8px; border-radius:6px; text-align:center; font-weight:600; color:#2e7d32;">
-                        <?php echo !empty($m['EXPIRY_DATE']) ? date('M d, Y', strtotime($m['EXPIRY_DATE'])) : 'No Expiry'; ?>
+                    <?php 
+                        // Calculate Expiry Status for each medicine
+                        $expiryStr = $m['EXPIRY_DATE'] ?? null;
+                        $expiryTs = (!empty($expiryStr)) ? strtotime($expiryStr) : null;
+                        
+                        // Default Style (Good / In Stock)
+                        $expiryClass = 'status-good';
+                        $statusText = !empty($expiryStr) ? date('M d, Y', $expiryTs) : 'No Expiry';
+
+                        if ($expiryTs) {
+                            if ($expiryTs < $now_ts) {
+                                // EXPIRED: Red Background
+                                $expiryStyle = "background: #ffebee; color: #c62828; border: 1px solid #ef9a9a;";
+                                $statusText = "⚠️ EXPIRED: " . $statusText;
+                            } elseif ($expiryTs <= $expiring_limit_ts) {
+                                // EXPIRING SOON: Orange/Yellow Background
+                                $expiryStyle = "background: #fff3e0; color: #ef6c00; border: 1px solid #ffcc80;";
+                                $statusText = "🕒 EXPIRING: " . $statusText;
+                            } else {
+                                // HEALTHY: Green Background
+                                $expiryStyle = "background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7;";
+                            }
+                        } else {
+                            // No Expiry Case
+                            $expiryStyle = "background: #f5f5f5; color: #757575; border: 1px solid #e0e0e0;";
+                        }
+                    ?>
+
+                    <div style="<?php echo $expiryStyle; ?> padding:8px; border-radius:6px; text-align:center; font-weight:600; font-size: 0.9em; margin-top: 10px;">
+                        <?php echo $statusText; ?>
                     </div>
 
                     <div style="display:flex; gap:10px; margin-top:15px;">
                         <a href="edit_medicine.php?id=<?php echo $m['MEDICINE_ID']; ?>" class="action-btn" style="background:#667eea;">✏️ Edit</a>
-                        <a href="#" class="action-btn" style="background:#4caf50;">ℹ️ Info</a>
+                        <a href="medicine_details.php?id=<?php echo $m['MEDICINE_ID']; ?>" class="action-btn" style="background:#4caf50;">ℹ️ Info</a>
                         <form method="POST" style="flex:1" onsubmit="return confirm('Delete?');">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="id" value="<?php echo $m['MEDICINE_ID']; ?>">

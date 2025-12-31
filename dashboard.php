@@ -18,187 +18,233 @@ $username = $_SESSION['username'] ?? 'User';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PHARMACY SYSTEM DASHBOARD</title>
     <style>
-        /* Reusing core CSS design */
+        /* Core Reset & Typography */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); min-height: 100vh; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); overflow: hidden; }
-        
-        /* Header */
-        .header { background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); color: white; padding: 30px 20px; text-align: center; }
-        .header-content h1 { font-size: 2.2em; margin-bottom: 5px; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2); }
-        .subtitle { font-size: 1.0em; opacity: 0.9; }
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            background: #f0f2f5; 
+            min-height: 100vh; 
+        }
 
-        /* Dashboard Grid Layout for Modules */
+        /* Top navigation bar */
+        .top-nav {
+            background: white;
+            padding: 12px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .user-info { font-size: 0.95em; color: #444; }
+        .user-info b { color: #0066ff; }
+
+        /* Main Hero Header */
+        .header { 
+            background: linear-gradient(135deg, #0052cc 0%, #007bff 100%); 
+            color: white; 
+            padding: 50px 20px; 
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 { 
+            font-size: 2.5em; 
+            margin-bottom: 10px; 
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .header p { opacity: 0.9; font-size: 1.1em; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px 50px 20px; }
+
+        /* Dashboard Grid */
         .module-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            padding: 30px;
-            background: #f8f9fa;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
         }
 
+        /* Unified Module Card Style */
         .module-card {
             background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            overflow: hidden;
-            border-top: 5px solid #0066ff; /* Primary color indicator */
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             display: flex;
             flex-direction: column;
+            border: 1px solid #e1e4e8;
+            height: 100%; /* Ensures all boxes in a row match height */
         }
+        
         .module-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            transform: translateY(-8px);
+            box-shadow: 0 12px 20px rgba(0,0,0,0.1);
+            border-color: #0066ff;
         }
 
         .module-header {
-            padding: 15px 20px;
-            background: #e3f2fd;
-            border-bottom: 1px solid #d0e0ff;
+            padding: 20px;
+            background: #f8fbff;
+            border-bottom: 1px solid #f0f2f5;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
+
         .module-header h2 {
-            font-size: 1.4em;
-            color: #0066ff;
+            font-size: 1.2em;
+            color: #0b2f6d;
             margin: 0;
+        }
+
+        .module-icon {
+            font-size: 1.5em;
         }
 
         .module-content {
             padding: 20px;
-            flex-grow: 1; /* Ensures content fills space for alignment */
+            flex-grow: 1;
         }
 
         .module-content ul {
             list-style: none;
             padding: 0;
         }
-        .module-content li {
-            margin-bottom: 8px;
-            font-size: 0.95em;
-        }
+
+        /* Styled Links */
         .module-content li a {
-            color: #333;
+            color: #495057;
             text-decoration: none;
-            transition: color 0.2s;
             display: block;
-            padding: 4px 0;
-            border-bottom: 1px dotted #ccc;
-        }
-        .module-content li a:hover {
-            color: #0099ff;
-            text-decoration: underline;
-        }
-        
-        .controls-top {
-            padding: 20px 30px 0 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: white;
-            padding-bottom: 20px;
-        }
-        .controls-top span {
-            font-weight: 600;
-            color: #333;
-        }
-        .btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-size: 0.9em;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            background: #f8f9fa;
+            transition: all 0.2s;
             font-weight: 500;
-            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .module-content li a:hover {
+            background: #e7f1ff;
+            color: #0066ff;
+            border-left: 3px solid #0066ff;
+            padding-left: 18px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 18px;
+            border-radius: 6px;
             text-decoration: none;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: 0.2s;
+            display: inline-block;
         }
-        .btn-secondary {
-            background: #e0e0e0;
-            color: #333;
-        }
-        .btn-secondary:hover {
-            background: #d0d0d0;
-        }
+        .btn-audit { background: #0066ff; color: white; margin-right: 10px; }
+        .btn-audit:hover { background: #0052cc; }
+        .btn-logout { background: #f1f3f5; color: #495057; }
+        .btn-logout:hover { background: #e9ecef; }
+
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="controls-top">
-            <span>Logged in as: **<?php echo htmlspecialchars($username); ?>** (Role: **<?php echo htmlspecialchars($userRole); ?>**)</span>
 
-            <div style="display: flex; gap; 10px;">
-                <?php if(strtolower($userRole) === 'admin'): ?>
-                    <a href="view_audit.php" class="btn" style="background: #0066ff; color: white;">🛡️ Audit Trail</a>
-                <?php endif; ?>
-         
-                <a href="logout.php" class="btn btn-secondary">Log Out</a>
-            </div>
-                </div>
-        
-        <header class="header">
-            <div class="header-content">
-                <h1>PHARMACY MANAGEMENT SYSTEM</h1>
-                <p class="subtitle">Central dashboard for all operational modules.</p>
-            </div>
-        </header>
+    <nav class="top-nav">
+        <div class="user-info">
+            Welcome back, <b><?php echo htmlspecialchars($username); ?></b> 
+            <span style="color: #6c757d; margin-left: 10px;">(Role: <?php echo htmlspecialchars($userRole); ?>)</span>
+        </div>
+        <div class="actions">
+            <?php if(strtolower($userRole) === 'admin'): ?>
+                <a href="view_audit.php" class="btn btn-audit">🛡️ Audit Trail</a>
+            <?php endif; ?>
+            <a href="logout.php" class="btn btn-logout">Log Out</a>
+        </div>
+    </nav>
 
+    <header class="header">
+        <div class="container">
+            <h1>Pharmacy Management</h1>
+            <p>Select a module below to manage your operations.</p>
+        </div>
+    </header>
+
+    <main class="container">
         <section class="module-grid">
             
             <div class="module-card">
-                <div class="module-header"><h2>📦 Inventory Management</h2></div>
+                <div class="module-header">
+                    <span class="module-icon">📦</span>
+                    <h2>Inventory</h2>
+                </div>
                 <div class="module-content">
                     <ul>
-                        <li><a href="medDirectory.php">Medicine List / Dashboard</a></li>
+                        <li><a href="medDirectory.php">Medicine Directory</a></li>
+                        <li><a href="stock.php">Stock Levels</a></li>
                     </ul>
                 </div>
             </div>
 
             <div class="module-card">
-                <div class="module-header"><h2>📝 Prescription Management</h2></div>
+                <div class="module-header">
+                    <span class="module-icon">📝</span>
+                    <h2>Prescriptions</h2>
+                </div>
                 <div class="module-content">
                     <ul>
-                        <li><a href="prescriptionDashboard.php">Prescription List / Dashboard (Future Page)</a></li>
+                        <li><a href="prescriptionDashboard.php">Prescription Dashboard</a></li>
+                        <li><a href="createPrescription.php">New Prescription</a></li>
                     </ul>
                 </div>
             </div>
 
             <div class="module-card">
-                <div class="module-header"><h2>💰 Sales & Billing</h2></div>
+                <div class="module-header">
+                    <span class="module-icon">💰</span>
+                    <h2>Sales & Billing</h2>
+                </div>
                 <div class="module-content">
                     <ul>
-                        <li><a href="Sales_Billing.php">Sales Dashboard (Future Page)</a></li>
+                        <li><a href="Sales_Billing.php">Sales Dashboard</a></li>
+                        <li><a href="new_sale.php">Process New Sale</a></li>
                     </ul>
                 </div>
             </div>
 
              <div class="module-card">
-                <div class="module-header"><h2>👤 User & Management</h2></div>
+                <div class="module-header">
+                    <span class="module-icon">👤</span>
+                    <h2>Management</h2>
+                </div>
                 <div class="module-content">
                     <ul>
-                        <li><a href="user_management.php">User List / Dashboard (Future Page)</a></li>
+                        <li><a href="user_management.php">User Management</a></li>
+                        <li><a href="patient_list.php">Patient Records</a></li>
                     </ul>
                 </div>
             </div>
 
              <div class="module-card">
-<<<<<<< HEAD
-    <div class="module-header"><h2>📈 Reports & Analytics</h2></div>
-    <div class="module-content">
-        <ul>
-            <li><a href="reports.php">📊 Report Dashboard</a></li>
-        </ul>
-    </div>
-</div>
-=======
-                <div class="module-header"><h2>📈 Reports & Analytics</h2></div>
+                <div class="module-header">
+                    <span class="module-icon">📈</span>
+                    <h2>Analytics</h2>
+                </div>
                 <div class="module-content">
                     <ul>
-                        <li><a href="reports.php">Report Dashboard (Future Page)</a></li>
+                        <li><a href="reports.php">Performance Reports</a></li>
                     </ul>
                 </div>
             </div>
->>>>>>> 48019c664dc8d44529b1e353fa35d58a2cacda34
 
         </section>
-    </div>
+    </main>
+
 </body>
 </html>

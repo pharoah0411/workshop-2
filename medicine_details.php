@@ -12,7 +12,6 @@ if ($id <= 0) {
 
 try {
     // 1. Try MySQL 2
-    // FIX: Changed table name to MEDICINE (All Caps)
     if (!$med && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
         $stmt = $mysql_conn2->prepare("SELECT MEDICINE_ID, NAME, CATEGORY_TYPE, QUANTITY_IN_STOCK, EXPIRY_DATE, UNIT_PRICE, SUPPLIER_NAME FROM MEDICINE WHERE MEDICINE_ID = ?");
         $stmt->bind_param("i", $id);
@@ -55,43 +54,53 @@ if ($med && !empty($med['EXPIRY_DATE'])) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Medicine Details</title>
+    <title>Medicine Details | <?php echo $med ? htmlspecialchars($med['NAME']) : 'Not Found'; ?></title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box }
-        body { font-family:'Segoe UI',Tahoma,Arial; background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%); min-height:100vh; padding:20px }
-        .container { max-width:900px; margin:0 auto; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.12) }
-        .header { background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%); color:#fff; padding:20px }
-        .content { padding:20px }
-        dl { max-width:600px }
-        dt { font-weight:700; margin-top:12px; color:#555; }
-        dd { margin-left:0; margin-bottom:8px; font-size:1.1em; color:#000; }
-        a.back { display:inline-block; margin-top:20px; color:#0066ff; text-decoration:none; font-weight:bold; }
-        .btn-edit { background:#667eea; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; margin-right:10px; }
+        body { font-family:'Segoe UI', Tahoma, Arial; background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%); min-height:100vh; padding:40px 20px }
+        .container { max-width:700px; margin:0 auto; background:#fff; border-radius:15px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,0.2) }
+        .header { background: linear-gradient(135deg, #0052cc 0%, #007bff 100%); color:#fff; padding:30px; text-align: center; }
+        .content { padding:40px }
+        dl { display: grid; grid-template-columns: 150px 1fr; gap: 15px; }
+        dt { font-weight:700; color:#666; font-size: 0.9em; text-transform: uppercase; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+        dd { padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 1.1em; color:#333; }
+        .actions { margin-top:30px; display: flex; gap: 15px; align-items: center; }
+        .btn-edit { background:#0066ff; color:white; padding:12px 25px; border-radius:8px; text-decoration:none; font-weight: bold; transition: 0.2s; }
+        .btn-edit:hover { background: #0052cc; }
+        .back { color:#666; text-decoration:none; font-weight:600; }
+        .back:hover { text-decoration: underline; }
         .error { color: red; background: #ffe6e6; padding: 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <header class="header"><h1>🔎 Medicine Details</h1></header>
+        <header class="header">
+            <h1>🔎 Medicine Information</h1>
+            <?php if($med): ?><p style="opacity: 0.8; margin-top: 5px;">Record for <?php echo htmlspecialchars($med['NAME']); ?></p><?php endif; ?>
+        </header>
         <div class="content">
             <?php if ($med): ?>
                 <dl>
-                    <dt>ID</dt><dd><?php echo htmlspecialchars($med['MEDICINE_ID']); ?></dd>
-                    <dt>Name</dt><dd><?php echo htmlspecialchars($med['NAME']); ?></dd>
+                    <dt>Medicine ID</dt><dd>#<?php echo htmlspecialchars($med['MEDICINE_ID']); ?></dd>
+                    <dt>Name</dt><dd><strong><?php echo htmlspecialchars($med['NAME']); ?></strong></dd>
                     <dt>Category</dt><dd><?php echo htmlspecialchars($med['CATEGORY_TYPE'] ?? 'N/A'); ?></dd>
-                    <dt>Stock</dt><dd><?php echo htmlspecialchars($med['QUANTITY_IN_STOCK']); ?></dd>
-                    <dt>Expiry</dt><dd><?php echo htmlspecialchars($expiryDate); ?></dd>
-                    <dt>Price</dt><dd>$<?php echo number_format((float)($med['UNIT_PRICE'] ?? 0), 2); ?></dd>
+                    <dt>Stock Level</dt><dd><?php echo htmlspecialchars($med['QUANTITY_IN_STOCK']); ?> units</dd>
+                    <dt>Expiry Date</dt><dd><?php echo htmlspecialchars($expiryDate); ?></dd>
+                    
+                    <dt>Unit Price</dt><dd><strong style="color: #2e7d32;">RM <?php echo number_format((float)($med['UNIT_PRICE'] ?? 0), 2); ?></strong></dd>
+                    
                     <dt>Supplier</dt><dd><?php echo htmlspecialchars($med['SUPPLIER_NAME'] ?? 'N/A'); ?></dd>
                 </dl>
-                <div style="margin-top:20px;">
-                    <a class="btn-edit" href="edit_medicine.php?id=<?php echo urlencode($med['MEDICINE_ID']); ?>">✏️ Edit Medicine</a>
+                <div class="actions">
+                    <a class="btn-edit" href="edit_medicine.php?id=<?php echo urlencode($med['MEDICINE_ID']); ?>">✏️ Edit Details</a>
                     <a class="back" href="medDirectory.php">← Back to Directory</a>
                 </div>
             <?php else: ?>
-                <p>Medicine not found.</p>
-                <?php if($error) echo "<p class='error'>$error</p>"; ?>
-                <a class="back" href="medDirectory.php">Back to Directory</a>
+                <div style="text-align: center;">
+                    <p style="font-size: 1.2em; color: #666;">Medicine record not found.</p>
+                    <?php if($error) echo "<p class='error'>$error</p>"; ?>
+                    <a class="btn-edit" href="medDirectory.php" style="display: inline-block; margin-top: 20px;">Return to Inventory</a>
+                </div>
             <?php endif; ?>
         </div>
     </div>
