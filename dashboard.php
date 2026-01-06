@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once "session_check.php";   // ✅ auto logout + login check
 require_once 'connection.php';
 
 // Check if user is NOT logged in. If not, redirect to login page.
@@ -125,14 +125,15 @@ $username = $_SESSION['username'] ?? 'User';
         <div class="controls-top">
             <span>Logged in as: **<?php echo htmlspecialchars($username); ?>** (Role: **<?php echo htmlspecialchars($userRole); ?>**)</span>
 
-            <div style="display: flex; gap; 10px;">
+            <div style="display: flex; gap: 10px;">
                 <?php if(strtolower($userRole) === 'admin'): ?>
                     <a href="view_audit.php" class="btn" style="background: #0066ff; color: white;">🛡️ Audit Trail</a>
+                    <a href="backup.php" class="btn" style="background: #28a745; color: white;">💾 Backup System</a>
                 <?php endif; ?>
          
                 <a href="logout.php" class="btn btn-secondary">Log Out</a>
             </div>
-                </div>
+        </div>
         
         <header class="header">
             <div class="header-content">
@@ -183,7 +184,22 @@ $username = $_SESSION['username'] ?? 'User';
                 <div class="module-header"><h2>📈 Reports & Analytics</h2></div>
                 <div class="module-content">
                     <ul>
-                        <li><a href="reports.php">Report Dashboard (Future Page)</a></li>
+                        <li><a href="reports.php">📊 Report Dashboard</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 💾 BACKUP & RESTORE CARD -->
+            <div class="module-card">
+                <div class="module-header"><h2>💾 Backup & Restore</h2></div>
+                <div class="module-content">
+                    <ul>
+                        <li><a href="backup.php">Database Backup System</a></li>
+                        <li style="margin-top: 10px; color: #666; font-size: 0.9em; list-style: none;">
+                            ✅ SQL + Excel formats<br>
+                            ✅ Multi-database support<br>
+                            ✅ Restore functionality
+                        </li>
                     </ul>
                 </div>
             </div>

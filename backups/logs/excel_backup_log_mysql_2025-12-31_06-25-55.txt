@@ -1,0 +1,6 @@
+✅ mysql Excel Backup SUCCESS: 2025-12-31 06:25:55
+User: admin2
+File: pharmacy_excel_mysql_2025-12-31_06-25-55.zip
+Size: 1629 bytes
+Tables backed up: 5
+Total records: 23
