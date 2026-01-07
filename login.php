@@ -24,12 +24,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $activeConn = null;
         $db_online = false;
 
+        // DEBUG: Log start
+        error_log("=== LOGIN ATTEMPT ===");
+        error_log("Username: $username");
+        error_log("Password entered: $password");
+
         try {
 
             /* ===============================
                1️⃣ SQL SERVER (PDO)
             =============================== */
             if (isset($pdo) && $pdo instanceof PDO) {
+<<<<<<< HEAD
                 $db_online = true;
                 $stmt = $pdo->prepare(
                     "SELECT USER_ID, USERNAME, PASSWORD, ROLE 
@@ -41,31 +47,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $user = array_change_key_case($res, CASE_UPPER);
                     $activeConn = $pdo;
                 }
+=======
+                $db_online_count++;
+                error_log("SQL Server connection: ACTIVE");
+                $stmt = $pdo->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?");
+                $stmt->execute([$username]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($res) { 
+                    $user = array_change_key_case($res, CASE_UPPER); 
+                    $activeConn = $pdo;
+                    error_log("Found user in SQL Server");
+                }
+            } else {
+                error_log("SQL Server connection: INACTIVE");
+>>>>>>> dd077382f4757021b3a788fbfe1893b8bd47cbb2
             }
 
             /* ===============================
                2️⃣ MYSQL
             =============================== */
             if (!$user && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
+<<<<<<< HEAD
                 $db_online = true;
                 $stmt = $mysql_conn2->prepare(
                     "SELECT USER_ID, USERNAME, PASSWORD, ROLE 
                      FROM `USER` WHERE USERNAME = ?"
                 );
+=======
+                $db_online_count++;
+                error_log("MySQL connection: ACTIVE");
+                $stmt = $mysql_conn2->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM `USER` WHERE USERNAME = ?");
+>>>>>>> dd077382f4757021b3a788fbfe1893b8bd47cbb2
                 $stmt->bind_param("s", $username);
                 $stmt->execute();
                 $result = $stmt->get_result();
                 if ($result->num_rows > 0) {
                     $user = array_change_key_case($result->fetch_assoc(), CASE_UPPER);
                     $activeConn = $mysql_conn2;
+                    error_log("Found user in MySQL: " . $user['USERNAME']);
                 }
                 $stmt->close();
+            } else {
+                error_log("MySQL connection: " . (isset($mysql_conn2) ? 'ACTIVE' : 'INACTIVE'));
             }
 
             /* ===============================
                3️⃣ POSTGRESQL
             =============================== */
             if (!$user && isset($pg_conn) && $pg_conn instanceof PDO) {
+<<<<<<< HEAD
                 $db_online = true;
                 $stmt = $pg_conn->prepare(
                     'SELECT user_id, username, password, role 
@@ -93,10 +123,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // ✅ HASHED PASSWORD CHECK
                 if (password_verify($password, $storedHash)) {
                     $authSuccess = true;
+=======
+                $db_online_count++;
+                error_log("PostgreSQL connection: ACTIVE");
+                $stmt = $pg_conn->prepare('SELECT user_id, username, password, role FROM "user" WHERE username = ?');
+                $stmt->execute([$username]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($res) { 
+                    $user = array_change_key_case($res, CASE_UPPER); 
+                    $activeConn = $pg_conn;
+                    error_log("Found user in PostgreSQL");
+                }
+            } else {
+                error_log("PostgreSQL connection: " . (isset($pg_conn) ? 'ACTIVE' : 'INACTIVE'));
+            }
+
+            error_log("Total DB connections: $db_online_count");
+            error_log("User found: " . ($user ? 'YES' : 'NO'));
+
+            // --- Authentication Logic ---
+            if ($db_online_count === 0) {
+                $error = "System Error: No databases are currently reachable.";
+            } elseif ($user) {
+                $storedPass = $user['PASSWORD'];
+                $authSuccess = false;
+
+                // DEBUG
+                error_log("Stored password: '$storedPass'");
+                error_log("Password length: " . strlen($storedPass));
+                error_log("Entered password: '$password'");
+                error_log("Entered password length: " . strlen($password));
+
+                // SIMPLIFIED AUTH - JUST DIRECT COMPARISON
+                if ($password === $storedPass) {
+                    $authSuccess = true;
+                    error_log("Password matches (direct comparison)");
+                } else {
+                    error_log("Password does NOT match (direct comparison)");
+                    
+                    // Try password_verify as fallback
+                    if (password_verify($password, $storedPass)) {
+                        $authSuccess = true;
+                        error_log("Password matches (password_verify)");
+                    }
+>>>>>>> dd077382f4757021b3a788fbfe1893b8bd47cbb2
                 }
 
                 if ($authSuccess) {
 
+<<<<<<< HEAD
                     $_SESSION['user_id']  = $user['USER_ID'];
                     $_SESSION['username'] = $user['USERNAME'];
                     $_SESSION['role']     = $user['ROLE'];
@@ -109,6 +184,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_SESSION['force_reset'] = true;
                         header('Location: reset_password.php');
                         exit;
+=======
+                    error_log("Login SUCCESS for user: " . $user['USERNAME']);
+
+                    if (file_exists('audit.php')) {
+                        require_once 'audit.php';
+                        logAudit($activeConn, 'LOGIN', 'Authentication', 'User logged into the system');
+>>>>>>> dd077382f4757021b3a788fbfe1893b8bd47cbb2
                     }
 
                     // ✅ Normal login
@@ -117,15 +199,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 } else {
                     $error = "Invalid username or password.";
+                    error_log("Login FAILED - password mismatch");
                 }
 
             } else {
                 $error = "Invalid username or password.";
+                error_log("Login FAILED - user not found");
             }
 
         } catch (Exception $e) {
+<<<<<<< HEAD
             $error = "Login error: " . htmlspecialchars($e->getMessage());
+=======
+            $error = 'Login error: ' . htmlspecialchars($e->getMessage());
+            error_log("Exception: " . $e->getMessage());
+>>>>>>> dd077382f4757021b3a788fbfe1893b8bd47cbb2
         }
+        
+        error_log("=== END LOGIN ATTEMPT ===");
     }
 }
 ?>
@@ -196,11 +287,33 @@ body {
 }
 </style>
 </head>
+<<<<<<< HEAD
 
 <body>
 <div class="container">
     <div class="header">
         <h1>🔑 Inventory Login</h1>
+=======
+<body>
+  <div class="container">
+    <header class="header"><h1>🔑 Inventory Login</h1></header>
+    <div class="content">
+      <?php if (!empty($error)): ?><p class="error-message"><?php echo $error; ?></p><?php endif; ?>
+      <form method="POST">
+        <div class="form-group">
+          <label>Username</label>
+          <input name="username" type="text" required value="<?php echo htmlspecialchars($username); ?>">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input name="password" type="password" required>
+        </div>
+        <button class="btn-primary" type="submit">Log In</button>
+        <div style="text-align:center; margin-top:15px;">
+        <a href="forgot_password.php"style="color:#0066ff; font-weight:600; text-decoration:none;"> Forgot Password?</a>
+</div>
+      </form>
+>>>>>>> dd077382f4757021b3a788fbfe1893b8bd47cbb2
     </div>
 
     <div class="content">

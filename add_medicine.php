@@ -1,121 +1,107 @@
 <?php
 require_once 'connection.php';
-require_once 'audit.php';
 
-$error = '';
+$id = isset($_REQUEST['id']) ? intval($_REQUEST['id']) : 0;
+$source = $_REQUEST['source'] ?? ''; // Added Source tracking
+$med = null;
 
-// --- Handle POST Request ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = isset($_POST['name']) ? trim($_POST['name']) : '';
-    $category = isset($_POST['category']) ? trim($_POST['category']) : null;
-    $stock = isset($_POST['stock']) ? intval($_POST['stock']) : 0;
-    $expiry = isset($_POST['expiryDate']) && $_POST['expiryDate'] !== '' ? $_POST['expiryDate'] : null;
-    $price = isset($_POST['price']) ? floatval($_POST['price']) : null;
-    $supplier = isset($_POST['supplier']) ? trim($_POST['supplier']) : null;
-    
-    // NEW: Get the selected target database
-    $target_source = $_POST['source'] ?? 'MySQL'; 
-
-    if ($name === '') {
-        $error = "Medicine Name is required.";
-    } else {
-        
-        // 1. MySQL #2 INSERT
-        if (($target_source === 'All' || $target_source === 'MySQL') && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
-            try {
-                $stmt = $mysql_conn2->prepare("INSERT INTO MEDICINE (NAME, CATEGORY_TYPE, QUANTITY_IN_STOCK, EXPIRY_DATE, UNIT_PRICE, SUPPLIER_NAME) VALUES (?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("ssisds", $name, $category, $stock, $expiry, $price, $supplier);
-                $stmt->execute();
-            } catch (Exception $e) { /* Ignore */ }
-        }
-
-        // 2. PostgreSQL INSERT
-        if (($target_source === 'All' || $target_source === 'Postgres') && isset($pg_conn) && $pg_conn instanceof PDO) {
-            try {
-                $stmt = $pg_conn->prepare("INSERT INTO MEDICINE (NAME, CATEGORY_TYPE, QUANTITY_IN_STOCK, EXPIRY_DATE, UNIT_PRICE, SUPPLIER_NAME) VALUES (:name, :category, :stock, :expiry, :price, :supplier)");
-                $stmt->execute([':name'=>$name, ':category'=>$category, ':stock'=>$stock, ':expiry'=>$expiry, ':price'=>$price, ':supplier'=>$supplier]);
-            } catch (Exception $e) { /* Ignore */ }
-        }
-
-        // 3. SQL Server INSERT
-        if ($target_source === 'All' || $target_source === 'SQLServer') {
-            try {
-                if (isset($pdo) && $pdo instanceof PDO) {
-                    $stmt = $pdo->prepare("INSERT INTO MEDICINE (NAME, CATEGORY_TYPE, QUANTITY_IN_STOCK, EXPIRY_DATE, UNIT_PRICE, SUPPLIER_NAME) VALUES (:name, :category, :stock, :expiry, :price, :supplier)");
-                    $stmt->execute([':name'=>$name, ':category'=>$category, ':stock'=>$stock, ':expiry'=>$expiry, ':price'=>$price, ':supplier'=>$supplier]);
-                } elseif (isset($conn) && $conn !== false) {
-                    $sql = "INSERT INTO MEDICINE (NAME, CATEGORY_TYPE, QUANTITY_IN_STOCK, EXPIRY_DATE, UNIT_PRICE, SUPPLIER_NAME) VALUES (?, ?, ?, ?, ?, ?)";
-                    $params = [$name, $category, $stock, $expiry, $price, $supplier];
-                    sqlsrv_query($conn, $sql, $params);
-                }
-            } catch (Exception $e) { /* Ignore */ }
-          } 
-            // --- NEW AUDIT LOG CODE START ---
-            // Identify which connection to use for logging the audit
-            $activeConn = $pdo ?? $mysql_conn2 ?? $pg_conn;
-            if ($activeConn) {
-              logAudit($activeConn, 'ADD', 'Inventory', "Added medicine: $name to $target_source database");
-            }
-            // --- NEW AUDIT LOG CODE END ---
-            
-        header('Location: medDirectory.php');
-        exit;
-    }
+if ($id <= 0 || empty($source)) {
+    header('Location: medDirectory.php');
+    exit;
 }
+
+// --- Targeted Update ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $name = $_POST['name'];
+    $category = $_POST['category'];
+    $stock = intval($_POST['stock']);
+    $expiry = !empty($_POST['expiryDate']) ? $_POST['expiryDate'] : null;
+    $price = floatval($_POST['price']);
+    $supplier = $_POST['supplier'];
+
+    if ($source === 'MySQL' && isset($mysql_conn2)) {
+        $stmt = $mysql_conn2->prepare("UPDATE MEDICINE SET NAME=?, CATEGORY_TYPE=?, QUANTITY_IN_STOCK=?, EXPIRY_DATE=?, UNIT_PRICE=?, SUPPLIER_NAME=? WHERE MEDICINE_ID=?");
+        $stmt->bind_param("ssisdsi", $name, $category, $stock, $expiry, $price, $supplier, $id);
+        $stmt->execute();
+    } elseif ($source === 'Postgres' && isset($pg_conn)) {
+        $stmt = $pg_conn->prepare("UPDATE MEDICINE SET NAME=:n, CATEGORY_TYPE=:c, QUANTITY_IN_STOCK=:s, EXPIRY_DATE=:e, UNIT_PRICE=:p, SUPPLIER_NAME=:sup WHERE MEDICINE_ID=:id");
+        $stmt->execute([':n'=>$name, ':c'=>$category, ':s'=>$stock, ':e'=>$expiry, ':p'=>$price, ':sup'=>$supplier, ':id'=>$id]);
+    } elseif ($source === 'SQLServer' && isset($pdo)) {
+        $stmt = $pdo->prepare("UPDATE MEDICINE SET NAME=:n, CATEGORY_TYPE=:c, QUANTITY_IN_STOCK=:s, EXPIRY_DATE=:e, UNIT_PRICE=:p, SUPPLIER_NAME=:sup WHERE MEDICINE_ID=:id");
+        $stmt->execute([':n'=>$name, ':c'=>$category, ':s'=>$stock, ':e'=>$expiry, ':p'=>$price, ':sup'=>$supplier, ':id'=>$id]);
+    }
+
+    header('Location: medDirectory.php');
+    exit;
+}
+
+// --- Targeted Fetch ---
+if ($source === 'MySQL' && isset($mysql_conn2)) {
+    $stmt = $mysql_conn2->prepare("SELECT * FROM MEDICINE WHERE MEDICINE_ID = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) $med = array_change_key_case($row, CASE_UPPER);
+} elseif ($source === 'Postgres' && isset($pg_conn)) {
+    $stmt = $pg_conn->prepare("SELECT * FROM MEDICINE WHERE MEDICINE_ID = :id");
+    $stmt->execute([':id' => $id]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($row) $med = array_change_key_case($row, CASE_UPPER);
+} elseif ($source === 'SQLServer' && isset($pdo)) {
+    $stmt = $pdo->prepare("SELECT * FROM MEDICINE WHERE MEDICINE_ID = :id");
+    $stmt->execute([':id' => $id]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($row) $med = array_change_key_case($row, CASE_UPPER);
+}
+
+$expiryDate = ($med && !empty($med['EXPIRY_DATE'])) ? date('Y-m-d', strtotime(is_object($med['EXPIRY_DATE']) ? $med['EXPIRY_DATE']->format('Y-m-d') : $med['EXPIRY_DATE'])) : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Add Medicine</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); min-height: 100vh; padding: 20px; }
-    .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); overflow: hidden; }
-    .header { background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); color: white; padding: 24px 20px; text-align: center; }
-    .content { padding: 24px; }
-    .form-group { margin-bottom: 12px; }
-    .form-group label { display:block; color:#333; font-weight:600; margin-bottom:6px; }
-    .form-group input, .form-group select { width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; }
-    .form-actions { display:flex; gap:10px; margin-top:16px; }
-    .btn { padding:10px 16px; border-radius:8px; border:none; cursor:pointer; color:white; font-weight:bold; }
-    .btn-primary { background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%); }
-    .btn-secondary { background:#999; text-decoration:none; display:inline-block; text-align:center; }
-    .error-message { color: red; margin-bottom: 15px; font-weight: bold; }
-  </style>
+    <meta charset="UTF-8">
+    <title>Edit Medicine</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 40px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        .header { background: #007bff; color: white; padding: 25px; text-align: center; }
+        .content { padding: 30px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 0.9em; }
+        .form-control { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+        .price-wrapper { position: relative; }
+        .price-wrapper::before { content: "RM"; position: absolute; left: 12px; top: 12px; font-weight: bold; color: #666; }
+        .price-wrapper input { padding-left: 45px; }
+        .btn-save { background: #007bff; color: white; width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <header class="header"><h1>🏥 Add Medicine</h1></header>
-    <div class="content">
-      <?php if ($error): ?>
-        <p class="error-message">Error: <?php echo $error; ?></p>
-      <?php endif; ?>
-
-      <form method="POST">
-        <div class="form-group">
-            <label>Save to Database:</label>
-            <select name="source">
-                <option value="MySQL">MySQL Only</option>
-                <option value="Postgres">Postgres Only</option>
-                <option value="SQLServer">SQL Server Only</option>
-                <option value="All">All Databases</option>
-            </select>
+    <div class="container">
+        <header class="header"><h1>✏️ Edit Medicine (<?php echo $source; ?>)</h1></header>
+        <div class="content">
+            <form method="POST">
+                <input type="hidden" name="source" value="<?php echo $source; ?>">
+                <div class="form-group"><label>Medicine Name</label><input name="name" class="form-control" value="<?php echo htmlspecialchars($med['NAME']??''); ?>" required></div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select name="category" class="form-control">
+                        <?php $c = $med['CATEGORY_TYPE']??''; ?>
+                        <option value="Tablet" <?php if($c=='Tablet') echo 'selected';?>>Tablet</option>
+                        <option value="Capsule" <?php if($c=='Capsule') echo 'selected';?>>Capsule</option>
+                        <option value="Syrup" <?php if($c=='Syrup') echo 'selected';?>>Syrup</option>
+                        <option value="Other" <?php if($c=='Other') echo 'selected';?>>Other</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Stock</label><input name="stock" type="number" class="form-control" value="<?php echo $med['QUANTITY_IN_STOCK']??0; ?>"></div>
+                <div class="form-group"><label>Expiry Date</label><input name="expiryDate" type="date" class="form-control" value="<?php echo $expiryDate; ?>"></div>
+                <div class="form-group">
+                    <label>Price</label>
+                    <div class="price-wrapper"><input name="price" type="number" step="0.01" class="form-control" value="<?php echo $med['UNIT_PRICE']??0; ?>"></div>
+                </div>
+                <div class="form-group"><label>Supplier</label><input name="supplier" class="form-control" value="<?php echo htmlspecialchars($med['SUPPLIER_NAME']??''); ?>"></div>
+                <button type="submit" class="btn-save">Update Medicine</button>
+            </form>
         </div>
-
-        <div class="form-group"><label>Medicine Name</label><input name="name" required></div>
-        <div class="form-group"><label>Category</label><input name="category"></div>
-        <div class="form-group"><label>Stock Quantity</label><input name="stock" type="number" min="0"></div>
-        <div class="form-group"><label>Expiry Date</label><input name="expiryDate" type="date"></div>
-        <div class="form-group"><label>Price per Unit</label><input name="price" type="number" step="0.01"></div>
-        <div class="form-group"><label>Supplier Name</label><input name="supplier"></div>
-
-        <div class="form-actions">
-          <button class="btn btn-primary" type="submit">Add Medicine</button>
-          <a class="btn btn-secondary" href="medDirectory.php">Cancel</a>
-        </div>
-      </form>
     </div>
-  </div>
 </body>
 </html>
