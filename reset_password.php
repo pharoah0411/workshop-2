@@ -2,14 +2,6 @@
 require_once 'connection.php';
 session_start();
 
-/* =============================
-   ACCESS CONTROL
-============================= */
-if (!isset($_SESSION['user_id']) && !isset($_SESSION['reset_user'])) {
-    header("Location: login.php");
-    exit;
-}
-
 $error = '';
 $success = '';
 
@@ -17,10 +9,72 @@ $success = '';
    STRONG PASSWORD CHECK (SERVER)
 ============================= */
 function isStrongPassword($password) {
-    return preg_match(
-        '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/',
-        $password
-    );
+    return preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/', $password);
+}
+
+/* ==========================================================
+   ACCESS CONTROL
+   - Case A: Logged-in forced reset -> use SESSION user_id
+   - Case B: Forgot password -> allow using GET email param
+========================================================== */
+$resetEmail = trim($_GET['email'] ?? '');
+
+if (!isset($_SESSION['user_id'])) {
+
+    // Forgot password must come with email
+    if ($resetEmail === '') {
+        header("Location: login.php");
+        exit;
+    }
+
+    // Look up user by email (store which DB found)
+    $found = false;
+    $_SESSION['reset_email'] = $resetEmail;
+    $_SESSION['reset_db'] = null;
+
+    // Postgres
+    if (!$found && isset($pg_conn) && $pg_conn instanceof PDO) {
+        $stmt = $pg_conn->prepare('SELECT user_id FROM "user" WHERE email = ?');
+        $stmt->execute([$resetEmail]);
+        $uid = $stmt->fetchColumn();
+        if ($uid) {
+            $_SESSION['reset_user_id'] = (int)$uid;
+            $_SESSION['reset_db'] = 'Postgres';
+            $found = true;
+        }
+    }
+
+    // MySQL
+    if (!$found && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
+        $stmt = $mysql_conn2->prepare("SELECT USER_ID FROM `USER` WHERE EMAIL = ?");
+        $stmt->bind_param("s", $resetEmail);
+        $stmt->execute();
+        $stmt->bind_result($uid);
+        if ($stmt->fetch()) {
+            $_SESSION['reset_user_id'] = (int)$uid;
+            $_SESSION['reset_db'] = 'MySQL';
+            $found = true;
+        }
+        $stmt->close();
+    }
+
+    // SQL Server
+    if (!$found && isset($pdo) && $pdo instanceof PDO) {
+        $stmt = $pdo->prepare("SELECT user_id FROM [USER] WHERE email = ?");
+        $stmt->execute([$resetEmail]);
+        $uid = $stmt->fetchColumn();
+        if ($uid) {
+            $_SESSION['reset_user_id'] = (int)$uid;
+            $_SESSION['reset_db'] = 'SQLServer';
+            $found = true;
+        }
+    }
+
+    if (!$found) {
+        // Email not found -> back to forgot password
+        header("Location: forgot_password.php?notfound=1");
+        exit;
+    }
 }
 
 /* =============================
@@ -33,98 +87,87 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($password === '' || $confirm === '') {
         $error = "All fields are required.";
-    }
-    elseif ($password !== $confirm) {
+    } elseif ($password !== $confirm) {
         $error = "Passwords do not match.";
-    }
-    elseif (!isStrongPassword($password)) {
+    } elseif (!isStrongPassword($password)) {
         $error = "Password does not meet security requirements.";
-    }
-    else {
+    } else {
 
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
         $updated = false;
 
         try {
-            /* =====================================
-               CASE A: LOGGED-IN USER (FORCED RESET)
-            ====================================== */
+
+            /* ===========================
+               CASE A: LOGGED IN USER
+            ============================ */
             if (isset($_SESSION['user_id'])) {
 
-                $userId = $_SESSION['user_id'];
+                $userId = (int)$_SESSION['user_id'];
 
-                // PostgreSQL
-                if ($pg_conn instanceof PDO) {
-                    $stmt = $pg_conn->prepare(
-                        'UPDATE "user" SET password = ? WHERE user_id = ?'
-                    );
+                // Postgres
+                if (!$updated && isset($pg_conn) && $pg_conn instanceof PDO) {
+                    $stmt = $pg_conn->prepare('UPDATE "user" SET password = ? WHERE user_id = ?');
                     $stmt->execute([$hashedPassword, $userId]);
                     $updated = true;
                 }
 
                 // MySQL
-                if (!$updated && $mysql_conn2 instanceof mysqli) {
-                    $stmt = $mysql_conn2->prepare(
-                        "UPDATE `USER` SET PASSWORD = ? WHERE USER_ID = ?"
-                    );
+                if (!$updated && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
+                    $stmt = $mysql_conn2->prepare("UPDATE `USER` SET PASSWORD = ? WHERE USER_ID = ?");
                     $stmt->bind_param("si", $hashedPassword, $userId);
                     $stmt->execute();
                     $updated = true;
                 }
 
                 // SQL Server
-                if (!$updated && $pdo instanceof PDO) {
-                    $stmt = $pdo->prepare(
-                        "UPDATE [USER] SET password = ? WHERE user_id = ?"
-                    );
+                if (!$updated && isset($pdo) && $pdo instanceof PDO) {
+                    $stmt = $pdo->prepare("UPDATE [USER] SET password = ? WHERE user_id = ?");
                     $stmt->execute([$hashedPassword, $userId]);
                     $updated = true;
                 }
             }
 
-            /* =====================================
-               CASE B: FORGOT PASSWORD (EMAIL FLOW)
-            ====================================== */
-            elseif (isset($_SESSION['reset_user'])) {
+            /* ===========================
+               CASE B: FORGOT PASSWORD
+            ============================ */
+            else {
 
-                $username = $_SESSION['reset_user'];
+                $userId = (int)($_SESSION['reset_user_id'] ?? 0);
+                $db     = $_SESSION['reset_db'] ?? '';
 
-                // PostgreSQL
-                if ($pg_conn instanceof PDO) {
-                    $stmt = $pg_conn->prepare(
-                        'UPDATE "user" SET password = ? WHERE username = ?'
-                    );
-                    $stmt->execute([$hashedPassword, $username]);
+                if ($userId <= 0 || $db === '') {
+                    throw new Exception("Reset session invalid. Please try again.");
+                }
+
+                if ($db === 'Postgres' && isset($pg_conn) && $pg_conn instanceof PDO) {
+                    $stmt = $pg_conn->prepare('UPDATE "user" SET password = ? WHERE user_id = ?');
+                    $stmt->execute([$hashedPassword, $userId]);
                     $updated = true;
                 }
 
-                // MySQL
-                if (!$updated && $mysql_conn2 instanceof mysqli) {
-                    $stmt = $mysql_conn2->prepare(
-                        "UPDATE `USER` SET PASSWORD = ? WHERE USERNAME = ?"
-                    );
-                    $stmt->bind_param("ss", $hashedPassword, $username);
+                if ($db === 'MySQL' && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
+                    $stmt = $mysql_conn2->prepare("UPDATE `USER` SET PASSWORD = ? WHERE USER_ID = ?");
+                    $stmt->bind_param("si", $hashedPassword, $userId);
                     $stmt->execute();
                     $updated = true;
                 }
 
-                // SQL Server
-                if (!$updated && $pdo instanceof PDO) {
-                    $stmt = $pdo->prepare(
-                        "UPDATE [USER] SET password = ? WHERE username = ?"
-                    );
-                    $stmt->execute([$hashedPassword, $username]);
+                if ($db === 'SQLServer' && isset($pdo) && $pdo instanceof PDO) {
+                    $stmt = $pdo->prepare("UPDATE [USER] SET password = ? WHERE user_id = ?");
+                    $stmt->execute([$hashedPassword, $userId]);
                     $updated = true;
                 }
             }
 
             if ($updated) {
-                // 🔐 CLEAR RESET FLAGS
+                // clear reset flags
                 unset($_SESSION['force_reset']);
-                unset($_SESSION['reset_user']);
+                unset($_SESSION['reset_email']);
+                unset($_SESSION['reset_user_id']);
+                unset($_SESSION['reset_db']);
 
-                $success = "Password updated successfully! Redirecting...";
-
+                $success = "Password updated successfully! Redirecting to login...";
                 header("refresh:2; url=login.php");
                 exit;
             } else {
@@ -172,9 +215,7 @@ body {
     text-align:center;
 }
 
-.content {
-    padding:26px;
-}
+.content { padding:26px; }
 
 .form-group { margin-bottom:14px; }
 
@@ -192,23 +233,22 @@ body {
     font-size:1em;
 }
 
-#password-rules p {
-    font-size:13px;
-    margin-top:4px;
-}
+#password-rules p { font-size:13px; margin-top:4px; }
 
 .btn-primary {
     width:100%;
     padding:12px;
-    background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%);
+    background:#999;
     color:white;
     border:none;
     border-radius:8px;
     font-weight:600;
     cursor:not-allowed;
+    transition: 0.2s;
 }
 
 .btn-primary.enabled {
+    background:linear-gradient(135deg,#0066ff 0%,#0099ff 100%);
     cursor:pointer;
 }
 
@@ -254,7 +294,6 @@ body {
         <?php endif; ?>
 
         <form method="POST">
-
             <div class="form-group">
                 <label>New Password</label>
                 <input type="password" name="password" id="password" onkeyup="checkPassword()" required>
@@ -276,14 +315,15 @@ body {
             <button id="submitBtn" class="btn-primary" disabled>
                 Reset Password
             </button>
-
         </form>
+
     </div>
 </div>
 
 <script>
 function checkPassword() {
     const p = document.getElementById("password").value;
+
     const rules = {
         length: p.length >= 8,
         upper: /[A-Z]/.test(p),
@@ -294,12 +334,20 @@ function checkPassword() {
 
     let valid = true;
 
-    for (let r in rules) {
-        const el = document.getElementById(r);
-        el.style.color = rules[r] ? "green" : "red";
-        el.innerHTML = (rules[r] ? "✅ " : "❌ ") + el.innerText.slice(2);
-        if (!rules[r]) valid = false;
-    }
+    // Update UI (without duplicating text)
+    document.getElementById("length").style.color  = rules.length  ? "green" : "red";
+    document.getElementById("upper").style.color   = rules.upper   ? "green" : "red";
+    document.getElementById("lower").style.color   = rules.lower   ? "green" : "red";
+    document.getElementById("number").style.color  = rules.number  ? "green" : "red";
+    document.getElementById("special").style.color = rules.special ? "green" : "red";
+
+    document.getElementById("length").innerHTML  = (rules.length  ? "✅" : "❌") + " At least 8 characters";
+    document.getElementById("upper").innerHTML   = (rules.upper   ? "✅" : "❌") + " Uppercase letter";
+    document.getElementById("lower").innerHTML   = (rules.lower   ? "✅" : "❌") + " Lowercase letter";
+    document.getElementById("number").innerHTML  = (rules.number  ? "✅" : "❌") + " Number";
+    document.getElementById("special").innerHTML = (rules.special ? "✅" : "❌") + " Special character";
+
+    valid = Object.values(rules).every(Boolean);
 
     const btn = document.getElementById("submitBtn");
     btn.disabled = !valid;
