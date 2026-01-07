@@ -75,11 +75,45 @@
             background-color: #0056b3;
             border-color: #0056b3;
         }
+        /* ===== TOP NAV BAR ===== */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #1565c0;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            margin: 20px auto 10px;
+            max-width: 1200px;
+        }
+
+        .nav-right a {
+            color: white;
+            text-decoration: none;
+            margin-left: 18px;
+            font-weight: 600;
+        }
+
+        .nav-right a:hover {
+            text-decoration: underline;
+        }
         
     </style>
 </head>
 
 <body>
+    <header class="top-nav">
+    <div class="nav-left">
+        Welcome, <strong><?= htmlspecialchars($username) ?></strong>
+    </div>
+
+    <div class="nav-right">
+        <a href="dashboard.php">🏠 Home</a>
+        <a href="logout.php">🚪 Logout</a>
+    </div>
+</header>
+
 
 <div class="container">
 

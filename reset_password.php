@@ -169,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $success = "Password updated successfully! Redirecting to login...";
                 header("refresh:2; url=login.php");
-                exit;
+
             } else {
                 $error = "Failed to update password. Please try again.";
             }
