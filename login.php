@@ -22,14 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $user = null;
         $activeConn = null;
-        $db_online_count = 0; // Fixed: added missing initialization
-
-        // DEBUG: Log start
-        error_log("=== LOGIN ATTEMPT ===");
-        error_log("Username: $username");
+        $db_online_count = 0; // Initialize counter
 
         try {
-
             /* ===============================
                1️⃣ SQL SERVER (PDO)
             =============================== */
@@ -81,17 +76,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $storedPass = $user['PASSWORD'];
                 $authSuccess = false;
 
+                // Authentication: Direct comparison or password_verify
                 if ($password === $storedPass) {
                     $authSuccess = true;
-                } else if (password_verify($password, $storedPass)) {
+                } elseif (password_verify($password, $storedPass)) {
                     $authSuccess = true;
                 }
 
                 if ($authSuccess) {
+                    // Audit Logging Integration
                     if (file_exists('audit.php')) {
                         require_once 'audit.php';
                         logAudit($activeConn, 'LOGIN', 'Authentication', 'User logged into the system');
                     }
+
+                    // Set session and redirect
+                    $_SESSION['user_id'] = $user['USER_ID'];
+                    $_SESSION['username'] = $user['USERNAME'];
+                    $_SESSION['role'] = $user['ROLE'];
+                    
                     header('Location: dashboard.php');
                     exit;
                 } else {
@@ -100,6 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $error = "Invalid username or password.";
             }
+
         } catch (Exception $e) {
             $error = 'Login error: ' . htmlspecialchars($e->getMessage());
         }
@@ -113,12 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Login</title>
     <style>
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
-        }
-        
+        * { margin:0; padding:0; box-sizing:border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%);
@@ -128,57 +127,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             align-items: center;
             padding: 20px;
         }
-
         .container {
             width: 100%;
             max-width: 400px;
             background: white;
             border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: hidden;
         }
-
         .header {
             background: linear-gradient(135deg, #0052cc, #007bff);
             color: white;
-            padding: 30px 20px;
+            padding: 30px;
             text-align: center;
         }
-
-        .header h1 {
-            font-size: 24px;
-            font-weight: 600;
-        }
-
-        .content { 
-            padding: 30px; 
-        }
-
-        .form-group { 
-            margin-bottom: 20px; 
-        }
-
+        .header h1 { font-size: 24px; margin: 0; }
+        .content { padding: 30px; }
+        .form-group { margin-bottom: 20px; }
         .form-group label { 
             font-weight: 600; 
             margin-bottom: 8px; 
-            display: block;
-            color: #444;
+            display: block; 
+            color: #333;
         }
-
         .form-group input {
             width: 100%;
             padding: 12px;
             border-radius: 8px;
-            border: 1px solid #ddd;
+            border: 1px solid #ccc;
             font-size: 16px;
-            transition: border-color 0.3s ease;
         }
-
         .form-group input:focus {
-            outline: none;
             border-color: #0066ff;
+            outline: none;
         }
-
         .btn {
             width: 100%;
             padding: 14px;
@@ -189,39 +171,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-weight: 600;
             font-size: 16px;
             cursor: pointer;
-            transition: opacity 0.3s ease;
+            margin-bottom: 15px;
+            transition: opacity 0.3s;
         }
-
-        .btn:hover {
-            opacity: 0.9;
+        .btn:hover { opacity: 0.9; }
+        .btn-patient {
+            background: #f8f9fa;
+            color: #0066ff;
+            border: 2px solid #0066ff;
         }
-
+        .btn-patient:hover { background: #eef2ff; }
         .error-message {
-            background: #fff0f0;
-            border: 1px solid #ffc1c1;
+            background: #ffebeb;
+            border: 1px solid #ff5a5a;
             color: #d8000c;
             padding: 12px;
             border-radius: 8px;
             margin-bottom: 20px;
             text-align: center;
-            font-size: 14px;
         }
-
-        .link {
+        .footer-links {
             text-align: center;
-            margin-top: 20px;
+            margin-top: 10px;
         }
-
-        .link a {
+        .footer-links a {
             color: #0066ff;
-            font-weight: 600;
             text-decoration: none;
+            font-weight: 600;
             font-size: 14px;
         }
-
-        .link a:hover {
-            text-decoration: underline;
+        .footer-links a:hover { text-decoration: underline; }
+        .divider {
+            text-align: center;
+            margin: 15px 0;
+            position: relative;
+            color: #888;
+            font-size: 14px;
         }
+        .divider::before, .divider::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background: #ddd;
+        }
+        .divider::before { left: 0; }
+        .divider::after { right: 0; }
     </style>
 </head>
 <body>
@@ -230,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <header class="header">
         <h1>🔑 Inventory Login</h1>
     </header>
-    
+
     <div class="content">
         <?php if (!empty($error)): ?>
             <div class="error-message"><?php echo $error; ?></div>
@@ -247,12 +243,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input id="password" name="password" type="password" required>
             </div>
 
-            <button class="btn" type="submit">Log In</button>
+            <button type="submit" class="btn">Log In</button>
         </form>
 
-        <div class="link">
+        <div class="footer-links">
             <a href="forgot_password.php">Forgot Password?</a>
         </div>
+
+        <div class="divider">OR</div>
+
+        <button type="button" class="btn btn-patient" onclick="window.location.href='patient_portal.php'">
+            I'm a Patient
+        </button>
     </div>
 </div>
 
