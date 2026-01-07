@@ -38,8 +38,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         /* =========================
            TEMP PASSWORD (NO DB CHANGE)
         ========================= */
-        $tempPassword  = "TEMP-" . rand(1000,9999);
+        $tempPassword = "Temp@1234!";
         $hashedPassword = password_hash($tempPassword, PASSWORD_DEFAULT);
+
 
         $success = false;
         $errors  = [];
