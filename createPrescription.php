@@ -75,19 +75,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_presc'])) {
             elseif ($target_source === 'Postgres') $target_conn = $pg_conn;
             elseif ($target_source === 'SQLServer') $target_conn = $pdo;
 
-            // C. SYNC PHARMACIST TO TARGET DB
-            $sqlPharmacistId = null;
-            if ($target_source === 'MySQL') {
-                $st = $target_conn->prepare("SELECT USER_ID FROM `USER` WHERE USERNAME = ?");
-                $st->bind_param("s", $username); $st->execute();
-                $sqlPharmacistId = $st->get_result()->fetch_assoc()['USER_ID'] ?? null;
-            } else {
-                $st = $target_conn->prepare("SELECT USER_ID FROM \"USER\" WHERE USERNAME = ?");
-                if ($target_source === 'SQLServer') $st = $target_conn->prepare("SELECT USER_ID FROM [USER] WHERE USERNAME = ?");
-                $st->execute([$username]);
-                $sqlPharmacistId = $st->fetchColumn();
-            }
+           // C. SYNC PHARMACIST TO TARGET DB
+$sqlPharmacistId = null;
 
+// Search for the current pharmacist in the target database
+if ($target_source === 'MySQL') {
+    $st = $target_conn->prepare("SELECT USER_ID FROM `USER` WHERE USERNAME = ?");
+    $st->bind_param("s", $username); $st->execute();
+    $sqlPharmacistId = $st->get_result()->fetch_assoc()['USER_ID'] ?? null;
+} else {
+    $tableName = ($target_source === 'SQLServer') ? "[USER]" : "\"user\"";
+    $st = $target_conn->prepare("SELECT USER_ID FROM $tableName WHERE USERNAME = ?");
+    $st->execute([$username]);
+    $sqlPharmacistId = $st->fetchColumn();
+}
+
+// 🚀 FIX: If Pharmacist is missing in the Target DB, create them automatically
+if (!$sqlPharmacistId) {
+    $role = $_SESSION['role'] ?? 'Pharmacist';
+    // Use the same password for consistency (or a temporary one)
+    $tempPass = 'SyncPassword123!'; 
+
+    if ($target_source === 'MySQL') {
+        $insP = $target_conn->prepare("INSERT INTO `USER` (USERNAME, PASSWORD, ROLE) VALUES (?, ?, ?)");
+        $insP->bind_param("sss", $username, $tempPass, $role);
+        $insP->execute();
+        $sqlPharmacistId = $target_conn->insert_id;
+    } else {
+        $tableName = ($target_source === 'SQLServer') ? "[USER]" : "\"user\"";
+        $insP = $target_conn->prepare("INSERT INTO $tableName (username, password, role) VALUES (?, ?, ?)");
+        $insP->execute([$username, $tempPass, $role]);
+        $sqlPharmacistId = ($target_source === 'SQLServer') 
+            ? $target_conn->query("SELECT SCOPE_IDENTITY()")->fetchColumn() 
+            : $target_conn->lastInsertId();
+    }
+}
             // D. SYNC PATIENT TO TARGET DB
             $sqlPatientId = null;
             if ($target_source === 'MySQL') {
@@ -209,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_presc'])) {
                     </div>
                     <div id="med-items"></div>
                     <button type="button" onclick="addRow()" style="background:#0066ff; color:white; padding:10px; border:none; border-radius:8px; cursor:pointer; margin-bottom:20px; width:100%;">+ Add Medicine</button>
-                    <button type="submit" name="submit_presc" class="btn-submit">💾 SAVE TO MYSQL</button>
+                    <button type="submit" name="submit_presc" class="btn-submit">💾 SAVE PRESCRIPTION</button>
                 </form>
             <?php endif; ?>
         </div>

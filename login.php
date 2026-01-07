@@ -84,20 +84,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 if ($authSuccess) {
-                    // Audit Logging Integration
-                    if (file_exists('audit.php')) {
-                        require_once 'audit.php';
-                        logAudit($activeConn, 'LOGIN', 'Authentication', 'User logged into the system');
-                    }
+    // ✅ SAVE USER DATA TO SESSION (This was missing)
+    $_SESSION['user_id']  = $user['USER_ID'];
+    $_SESSION['username'] = $user['USERNAME'];
+    $_SESSION['role']     = $user['ROLE'];
 
-                    // Set session and redirect
-                    $_SESSION['user_id'] = $user['USER_ID'];
-                    $_SESSION['username'] = $user['USERNAME'];
-                    $_SESSION['role'] = $user['ROLE'];
-                    
-                    header('Location: dashboard.php');
-                    exit;
-                } else {
+    error_log("Login SUCCESS for user: " . $user['USERNAME']);
+
+    if (file_exists('audit.php')) {
+        require_once 'audit.php';
+        logAudit($activeConn, 'LOGIN', 'Authentication', 'User logged into the system');
+    }
+
+    header('Location: dashboard.php');
+    exit;
+} else {
                     $error = "Invalid username or password.";
                 }
             } else {
