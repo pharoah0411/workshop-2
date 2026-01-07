@@ -30,6 +30,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $id_to_delete = intval($_POST['id']);
     $deleted = false;
     
+    /* ===== STEP A: FETCH MEDICINE NAME (SQL SERVER) ===== */
+    $medicineName = 'UNKNOWN';
+
+        if ($id_to_delete > 0 && isset($pdo) && $pdo instanceof PDO) {
+        try {
+            $stmt = $pdo->prepare(
+            "SELECT NAME FROM MEDICINE WHERE MEDICINE_ID = :id"
+        );
+            $stmt->execute([':id' => $id_to_delete]);
+            $medicineName = $stmt->fetchColumn() ?: 'UNKNOWN';
+        } catch (Exception $e) {
+            // Ignore fetch errors
+        }
+    }   
+
     if ($id_to_delete > 0) {
         try {
             // MySQL 2 (Fixed: MEDICINE)
