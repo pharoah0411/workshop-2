@@ -33,11 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         } catch (Exception $e) {}
     }
-    header('Location: prescriptiondashboard.php');
+    header('Location: prescriptionDashboard.php');
     exit;
 }
 
-// --- Handle DELETE Prescription (FIXED: Deletes Details First) ---
+// --- Handle DELETE Prescription (FIXED: Handles Foreign Keys) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_prescription') {
     $presc_id = intval($_POST['prescription_id']);
     $target_source = $_POST['source'] ?? '';
@@ -45,13 +45,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if ($presc_id > 0) {
         try {
             if ($target_source === 'MySQL' && isset($mysql_conn2)) {
-                // Delete details first
                 $mysql_conn2->query("DELETE FROM PRESCRIPTION_DETAIL WHERE PRESCRIPTION_ID = $presc_id");
                 $stmt = $mysql_conn2->prepare("DELETE FROM PRESCRIPTION WHERE PRESCRIPTION_ID = ?");
                 $stmt->bind_param("i", $presc_id);
                 $stmt->execute();
             }
             if ($target_source === 'Postgres' && isset($pg_conn)) {
+                // DELETE PAYMENTS FIRST to avoid Foreign Key constraint errors
+                $pg_conn->prepare("DELETE FROM public.payment WHERE prescription_id = ?")->execute([$presc_id]);
                 $pg_conn->prepare("DELETE FROM PRESCRIPTION_DETAIL WHERE PRESCRIPTION_ID = ?")->execute([$presc_id]);
                 $stmt = $pg_conn->prepare("DELETE FROM PRESCRIPTION WHERE PRESCRIPTION_ID = :id");
                 $stmt->execute([':id' => $presc_id]);
@@ -61,9 +62,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $stmt = $pdo->prepare("DELETE FROM PRESCRIPTION WHERE PRESCRIPTION_ID = :id");
                 $stmt->execute([':id' => $presc_id]);
             }
-        } catch (Exception $e) {}
+        } catch (Exception $e) {
+            error_log("Delete Error: " . $e->getMessage());
+        }
     }
-    header('Location: prescriptiondashboard.php');
+    header('Location: prescriptionDashboard.php');
     exit;
 }
 
@@ -158,7 +161,7 @@ usort($prescriptions, fn($a,$b)=>$b['PRESCRIPTION_ID']-$a['PRESCRIPTION_ID']);
     <div class="nav-links">
         <a href="dashboard.php">🏠 Home</a>
         <a href="medDirectory.php">📦 Medicines</a>
-        <a href="prescriptiondashboard.php">📝 Prescriptions</a>
+        <a href="prescriptionDashboard.php">📝 Prescriptions</a>
         <a href="logout.php">Logout</a>
     </div>
 </header>
@@ -229,9 +232,9 @@ usort($prescriptions, fn($a,$b)=>$b['PRESCRIPTION_ID']-$a['PRESCRIPTION_ID']);
                                 <button type="submit" style="background:none; border:none; color:#28a745; cursor:pointer; font-weight:bold; text-decoration:underline;" onclick="return confirm('Mark as Completed?')">Done</button>
                             </form>
                             <a href="Sales_Billing.php?presc_id=<?= $p['PRESCRIPTION_ID'] ?>&source=<?= $src ?>" 
-   class="btn" style="background:#28a745; padding: 5px 10px; font-size: 0.8em;" title="Bill Now">
-   <i class="fas fa-credit-card"></i> Bill Now
-</a>
+                               class="btn" style="background:#28a745; padding: 5px 10px; font-size: 0.8em;" title="Bill Now">
+                               <i class="fas fa-credit-card"></i> Bill Now
+                            </a>
                             <?php endif; ?>
                             <form method="POST" style="display:inline;">
                                 <input type="hidden" name="action" value="delete_prescription">
