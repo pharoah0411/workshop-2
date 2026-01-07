@@ -25,19 +25,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db_online_count = 0; // Initialize counter
 
         try {
-            /* ===============================
-               1️⃣ SQL SERVER (PDO)
-            =============================== */
-            if (isset($pdo) && $pdo instanceof PDO) {
-                $db_online_count++;
-                $stmt = $pdo->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?");
-                $stmt->execute([$username]);
-                $res = $stmt->fetch(PDO::FETCH_ASSOC);
-                if ($res) { 
-                    $user = array_change_key_case($res, CASE_UPPER); 
-                    $activeConn = $pdo;
-                }
-            }
 
             /* ===============================
                2️⃣ MYSQL
@@ -55,6 +42,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->close();
             }
 
+            /* ===============================
+               1️⃣ SQL SERVER (PDO)
+            =============================== */
+            if (isset($pdo) && $pdo instanceof PDO) {
+                $db_online_count++;
+                $stmt = $pdo->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?");
+                $stmt->execute([$username]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($res) { 
+                    $user = array_change_key_case($res, CASE_UPPER); 
+                    $activeConn = $pdo;
+                }
+            }
             /* ===============================
                3️⃣ POSTGRESQL
             =============================== */
