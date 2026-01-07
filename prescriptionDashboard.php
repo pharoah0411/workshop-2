@@ -228,6 +228,10 @@ usort($prescriptions, fn($a,$b)=>$b['PRESCRIPTION_ID']-$a['PRESCRIPTION_ID']);
                                 <input type="hidden" name="status" value="Completed">
                                 <button type="submit" style="background:none; border:none; color:#28a745; cursor:pointer; font-weight:bold; text-decoration:underline;" onclick="return confirm('Mark as Completed?')">Done</button>
                             </form>
+                            <a href="Sales_Billing.php?presc_id=<?= $p['PRESCRIPTION_ID'] ?>&source=<?= $src ?>" 
+   class="btn" style="background:#28a745; padding: 5px 10px; font-size: 0.8em;" title="Bill Now">
+   <i class="fas fa-credit-card"></i> Bill Now
+</a>
                             <?php endif; ?>
                             <form method="POST" style="display:inline;">
                                 <input type="hidden" name="action" value="delete_prescription">
