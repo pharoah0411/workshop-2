@@ -21,20 +21,35 @@ if (isset($pg_conn)) {
 }
 
 // 2. Fetch from MySQL
-if (isset($mysql_conn2)) {
+if (isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
     try {
-        $sql = "SELECT p.patient_id, p.name AS full_name, p.gender, p.dob, p.ic_no, p.address 
-                FROM patient p 
-                ORDER BY p.patient_id ASC";
+        $sql = "SELECT 
+                    p.PATIENT_ID AS patient_id,
+                    p.NAME AS full_name,
+                    p.GENDER AS gender,
+                    p.DOB AS dob,
+                    p.IC_NO AS ic_no,
+                    p.ADDRESS AS address
+                FROM PATIENT p
+                ORDER BY p.PATIENT_ID ASC";
+
         $result = $mysql_conn2->query($sql);
+
         if ($result) {
             while ($row = $result->fetch_assoc()) {
                 $row['source'] = 'MySQL';
                 $all_patients[] = $row;
             }
+        } else {
+            // optional debug:
+            // echo "MySQL Error: " . $mysql_conn2->error;
         }
-    } catch (Exception $e) { }
+    } catch (Exception $e) {
+        // optional debug:
+        // echo "MySQL Exception: " . $e->getMessage();
+    }
 }
+
 
 // 3. Fetch from SQL Server
 if (isset($pdo)) {

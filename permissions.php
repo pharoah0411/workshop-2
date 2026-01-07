@@ -47,7 +47,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <table border="0" cellpadding="10" cellspacing="0" 
            style="width:100%; background:white; border-radius:10px;">
 
-        <tr style="background:#0b2f6d; color:white;">
+        <tr style="background:linear-gradient(135deg, #0066ff 0%, #0099ff 100%); color:white;">
             <th>Permission</th>
             <th>Admin</th>
             <th>Pharmacist</th>
@@ -85,7 +85,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <br>
     <button type="submit"
-        style="padding:10px 20px; background:#0b2f6d; color:white; border:0; border-radius:5px;">
+        style="padding:10px 20px; background:linear-gradient(135deg, #0066ff 0%, #0099ff 100%); color:white; border:0; border-radius:5px;">
         Save Permissions
     </button>
 </form>
