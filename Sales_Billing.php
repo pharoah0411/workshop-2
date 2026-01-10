@@ -129,7 +129,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['finalize_bill'])) {
             <p class="text-muted">Prescription Record</p>
         </div>
         <div class="col-sm-6 text-sm-end">
-            <h4 class="mb-0">#<?= htmlspecialchars($presc_id) ?></h4>
+            <td><?= htmlspecialchars($item['MED_NAME'] ?? '') ?></td>
             <small class="text-muted">Date: <?= date('d-m-Y') ?></small>
         </div>
     </div>
