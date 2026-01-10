@@ -25,6 +25,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db_online_count = 0; // Initialize counter
 
         try {
+            /* ===============================
+               1️⃣ SQL SERVER (PDO)
+            =============================== */
+            if (isset($pdo) && $pdo instanceof PDO) {
+                $db_online_count++;
+                $stmt = $pdo->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?");
+                $stmt->execute([$username]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($res) { 
+                    $user = array_change_key_case($res, CASE_UPPER); 
+                    $activeConn = $pdo;
+                }
+            }
 
             /* ===============================
                2️⃣ MYSQL
@@ -42,19 +55,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->close();
             }
 
-            /* ===============================
-               1️⃣ SQL SERVER (PDO)
-            =============================== */
-            if (isset($pdo) && $pdo instanceof PDO) {
-                $db_online_count++;
-                $stmt = $pdo->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?");
-                $stmt->execute([$username]);
-                $res = $stmt->fetch(PDO::FETCH_ASSOC);
-                if ($res) { 
-                    $user = array_change_key_case($res, CASE_UPPER); 
-                    $activeConn = $pdo;
-                }
-            }
             /* ===============================
                3️⃣ POSTGRESQL
             =============================== */
@@ -84,13 +84,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 if ($authSuccess) {
-    // ✅ SAVE USER DATA TO SESSION (This was missing)
+
+    // ✅ SAVE USER DATA TO SESSION
     $_SESSION['user_id']  = $user['USER_ID'];
     $_SESSION['username'] = $user['USERNAME'];
     $_SESSION['role']     = $user['ROLE'];
 
-    error_log("Login SUCCESS for user: " . $user['USERNAME']);
+    // ✅ FORCE RESET LOGIC (new users / temp password)
+    // If your add_user uses Temp@xxxx, this will work
+    if (strpos($password, "Temp@1234!") === 0) {
+        $_SESSION['force_reset'] = 1;
+        header("Location: reset_password.php");
+        exit;
+    }
 
+    // ✅ Audit Logging
     if (file_exists('audit.php')) {
         require_once 'audit.php';
         logAudit($activeConn, 'LOGIN', 'Authentication', 'User logged into the system');
@@ -98,9 +106,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     header('Location: dashboard.php');
     exit;
+
 } else {
-                    $error = "Invalid username or password.";
-                }
+    $error = "Invalid username or password.";
+}
             } else {
                 $error = "Invalid username or password.";
             }
