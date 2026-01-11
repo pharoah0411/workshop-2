@@ -119,7 +119,23 @@ $prescriptions = array_filter($prescriptions, function($p) use ($search, $status
     }
     return true;
 });
-usort($prescriptions, fn($a,$b)=>$b['PRESCRIPTION_ID']-$a['PRESCRIPTION_ID']);
+
+// --- UPDATED SORTING LOGIC: PENDING ON TOP, COMPLETED ON BOTTOM ---
+usort($prescriptions, function($a, $b) {
+    // 1. Prioritize 'Pending' status
+    $statusA = strtolower($a['STATUS'] ?? '');
+    $statusB = strtolower($b['STATUS'] ?? '');
+
+    if ($statusA === 'pending' && $statusB !== 'pending') {
+        return -1; // $a comes first
+    }
+    if ($statusB === 'pending' && $statusA !== 'pending') {
+        return 1; // $b comes first
+    }
+
+    // 2. If statuses are the same (both Pending or both Completed), sort by ID descending
+    return (int)($b['PRESCRIPTION_ID'] ?? 0) - (int)($a['PRESCRIPTION_ID'] ?? 0);
+});
 ?>
 
 <!DOCTYPE html>
@@ -231,10 +247,6 @@ usort($prescriptions, fn($a,$b)=>$b['PRESCRIPTION_ID']-$a['PRESCRIPTION_ID']);
                                 <input type="hidden" name="status" value="Completed">
                                 <button type="submit" style="background:none; border:none; color:#28a745; cursor:pointer; font-weight:bold; text-decoration:underline;" onclick="return confirm('Mark as Completed?')">Done</button>
                             </form>
-                            <a href="Sales_Billing.php?presc_id=<?= $p['PRESCRIPTION_ID'] ?>&source=<?= $src ?>" 
-                               class="btn" style="background:#28a745; padding: 5px 10px; font-size: 0.8em;" title="Bill Now">
-                               <i class="fas fa-credit-card"></i> Bill Now
-                            </a>
                             <?php endif; ?>
                             <form method="POST" style="display:inline;">
                                 <input type="hidden" name="action" value="delete_prescription">

@@ -10,20 +10,19 @@ if (!isset($_SESSION['user_id'])) {
 
 $username = $_SESSION['username'] ?? 'User';
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-$source = $_GET['source'] ?? 'MySQL'; // Default to MySQL if not specified
+$source = $_GET['source'] ?? 'MySQL'; 
 
 $prescription = null;
 $details = [];
 
 if ($id > 0) {
     try {
-        // Choose the correct connection and SQL syntax
         $conn = null;
-        $db_type = ''; // 'mysqli' or 'pdo'
+        $db_type = ''; 
         
-        // Define SQL template with placeholders for reserved words
+        // Use explicit aliases to ensure columns don't collide and are easily identified
         $sql = "SELECT pr.*, 
-                       p.NAME AS PATIENT_NAME, p.IC_NO, p.ADDRESS,
+                       p.NAME AS PATIENT_NAME, p.IC_NO AS PATIENT_IC, p.ADDRESS AS PATIENT_ADDR,
                        u.NAME AS PHARMACIST_NAME
                 FROM PRESCRIPTION pr
                 JOIN PATIENT p ON pr.PATIENT_ID = p.PATIENT_ID
@@ -58,6 +57,7 @@ if ($id > 0) {
             }
 
             if ($prescription) {
+                // Force all keys to UPPERCASE for consistency across all DB types
                 $prescription = array_change_key_case($prescription, CASE_UPPER);
 
                 // 2. Fetch Details
@@ -97,7 +97,9 @@ if ($id > 0) {
         body { background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); min-height: 100vh; padding: 20px; }
         
         .top-nav { display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; background: #1565c0; color: white; border-radius: 10px; margin-bottom: 20px; }
-        .nav-links a { color: white; text-decoration: none; margin-left: 15px; font-weight: 500; }
+        .nav-links { display: flex; gap: 15px; align-items: center; }
+        .nav-links a { color: white; text-decoration: none; font-weight: 500; padding: 8px 12px; border-radius: 5px; transition: 0.3s; }
+        .nav-links a:hover { background: rgba(255, 255, 255, 0.2); }
 
         .paper-container { max-width: 850px; margin: 0 auto; }
         .paper { background: white; padding: 50px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); position: relative; }
@@ -122,11 +124,11 @@ if ($id > 0) {
         .actions { margin-top: 40px; display: flex; justify-content: flex-end; gap: 10px; }
         .btn { padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: bold; cursor: pointer; border: none; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
         .btn-print { background: #0066ff; color: white; }
-        .btn-back { background: #f0f0f0; color: #555; }
+        .btn-back { background: #f0f0f0; color: #555; border: 1px solid #ddd; }
         .btn:hover { opacity: 0.9; transform: translateY(-1px); }
 
         @media print {
-            .no-print, .top-nav { display: none; }
+            .no-print, .top-nav { display: none !important; }
             body { background: white; padding: 0; }
             .paper { box-shadow: none; border: none; padding: 0; }
             .paper::before { display: none; }
@@ -138,6 +140,7 @@ if ($id > 0) {
 <header class="top-nav no-print">
     <div>Logged in: <strong><?php echo htmlspecialchars($username ?? ''); ?></strong></div>
     <div class="nav-links">
+        <a href="javascript:history.back()"><i class="fas fa-arrow-left"></i> Back</a>
         <a href="dashboard.php">🏠 Dashboard</a>
         <a href="prescriptiondashboard.php">📝 Prescriptions</a>
     </div>
@@ -152,8 +155,9 @@ if ($id > 0) {
                     <span class="source-badge">Database: <?php echo $source; ?></span>
                 </div>
                 <div>
-                    <span class="status-badge status-<?php echo strtoupper($prescription['STATUS'] ?? ''); ?>">
-                        <?php echo strtoupper($prescription['STATUS'] ?? 'PENDING'); ?>
+                    <?php $status = strtoupper($prescription['STATUS'] ?? 'PENDING'); ?>
+                    <span class="status-badge status-<?php echo $status; ?>">
+                        <?php echo $status; ?>
                     </span>
                 </div>
             </div>
@@ -163,8 +167,8 @@ if ($id > 0) {
                     <div class="info-group">
                         <label>Patient Details</label>
                         <div style="font-size: 1.4em; color: #0066ff;"><?php echo htmlspecialchars($prescription['PATIENT_NAME'] ?? 'N/A'); ?></div>
-                        <div style="color: #666; margin-top:5px;">IC: <?php echo htmlspecialchars($prescription['IC_NO'] ?? 'N/A'); ?></div>
-                        <div style="color: #666;">Addr: <?php echo htmlspecialchars($prescription['ADDRESS'] ?? 'N/A'); ?></div>
+                        <div style="color: #666; margin-top:5px;">IC: <?php echo htmlspecialchars($prescription['PATIENT_IC'] ?? 'N/A'); ?></div>
+                        <div style="color: #666;">Addr: <?php echo htmlspecialchars($prescription['PATIENT_ADDR'] ?? 'N/A'); ?></div>
                     </div>
                 </div>
                 <div style="border-left: 2px solid #f0f0f0; padding-left: 30px;">
@@ -177,7 +181,13 @@ if ($id > 0) {
                         <div>
                             <?php 
                             $date = $prescription['DATE_ISSUED'] ?? '';
-                            echo (is_string($date)) ? $date : $date->format('d M Y, h:i A'); 
+                            if (is_object($date)) {
+                                echo $date->format('d M Y, h:i A');
+                            } elseif (!empty($date)) {
+                                echo date('d M Y, h:i A', strtotime($date));
+                            } else {
+                                echo 'N/A';
+                            }
                             ?>
                         </div>
                     </div>
@@ -228,7 +238,7 @@ if ($id > 0) {
                 <i class="fas fa-exclamation-triangle" style="font-size: 4em; color: #f39c12; margin-bottom: 20px;"></i>
                 <h2>Prescription Not Found</h2>
                 <p>The record #<?php echo $id; ?> could not be located in the <?php echo $source; ?> database.</p>
-                <a href="prescriptiondashboard.php" class="btn btn-back" style="display:inline-block; margin-top:20px;">Return to Dashboard</a>
+                <a href="prescriptiondashboard.php" class="btn btn-back" style="display:inline-block; margin-top:20px;">Return to List</a>
             </div>
         <?php endif; ?>
     </div>
