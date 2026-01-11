@@ -203,7 +203,10 @@ if (!$sqlPharmacistId) {
 <body>
     <header class="top-nav">
         <div>User: <strong><?= htmlspecialchars($username ?? '') ?></strong></div>
-        <a href="prescriptionDashboard.php" style="color:white; text-decoration:none;">🏠 Dashboard</a>
+        <div style="display: flex; gap: 20px;">
+            <a href="javascript:history.back()" style="color:white; text-decoration:none;">⬅️ Back</a>
+            <a href="prescriptionDashboard.php" style="color:white; text-decoration:none;">🏠 Dashboard</a>
+        </div>
     </header>
 
     <div class="container">
