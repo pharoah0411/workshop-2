@@ -41,41 +41,56 @@ try {
     }
 
     /* ==========================
-       MYSQL DELETE
-    =========================== */
-    if ($db === "MySQL" && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
+   MYSQL DELETE
+=========================== */
+if ($db === "MySQL" && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
 
-        $mysql_conn2->begin_transaction();
+    $mysql_conn2->begin_transaction();
 
-        // Optional: block deleting admin
-        $stmtRole = $mysql_conn2->prepare("SELECT ROLE FROM `USER` WHERE USER_ID = ?");
-        $stmtRole->bind_param("i", $user_id);
-        $stmtRole->execute();
-        $stmtRole->bind_result($role);
-        if (!$stmtRole->fetch()) {
-            $stmtRole->close();
-            throw new Exception("User not found in MySQL.");
-        }
+    // Check if user exists + role
+    $stmtRole = $mysql_conn2->prepare("SELECT ROLE FROM `USER` WHERE USER_ID = ?");
+    $stmtRole->bind_param("i", $user_id);
+    $stmtRole->execute();
+    $stmtRole->bind_result($role);
+    if (!$stmtRole->fetch()) {
         $stmtRole->close();
-
-        if (strtolower($role) === 'admin') throw new Exception("Admin account cannot be deleted.");
-
-        // ✅ delete child first (patient)
-        $stmtP = $mysql_conn2->prepare("DELETE FROM PATIENT WHERE USER_ID = ?");
-        $stmtP->bind_param("i", $user_id);
-        $stmtP->execute();
-        $stmtP->close();
-
-        // ✅ then delete user
-        $stmtU = $mysql_conn2->prepare("DELETE FROM `USER` WHERE USER_ID = ?");
-        $stmtU->bind_param("i", $user_id);
-        $stmtU->execute();
-        $stmtU->close();
-
-        $mysql_conn2->commit();
-        header("Location: user_list.php?deleted=1");
-        exit;
+        throw new Exception("User not found in MySQL.");
     }
+    $stmtRole->close();
+
+    if (strtolower($role) === 'admin') {
+        throw new Exception("Admin account cannot be deleted.");
+    }
+
+    // ✅ NEW: Check prescriptions referencing this pharmacist
+    $stmtChk = $mysql_conn2->prepare("SELECT COUNT(*) FROM PRESCRIPTION WHERE PHARMACIST_ID = ?");
+    $stmtChk->bind_param("i", $user_id);
+    $stmtChk->execute();
+    $stmtChk->bind_result($presCount);
+    $stmtChk->fetch();
+    $stmtChk->close();
+
+    if ($presCount > 0) {
+        throw new Exception("Cannot delete this user because they are referenced in PRESCRIPTION records ($presCount record(s)).");
+    }
+
+    // ✅ delete patient records first (if exist)
+    $stmtP = $mysql_conn2->prepare("DELETE FROM PATIENT WHERE USER_ID = ?");
+    $stmtP->bind_param("i", $user_id);
+    $stmtP->execute();
+    $stmtP->close();
+
+    // ✅ now delete user
+    $stmtU = $mysql_conn2->prepare("DELETE FROM `USER` WHERE USER_ID = ?");
+    $stmtU->bind_param("i", $user_id);
+    $stmtU->execute();
+    $stmtU->close();
+
+    $mysql_conn2->commit();
+    header("Location: user_list.php?deleted=1");
+    exit;
+}
+
 
     /* ==========================
        SQL SERVER DELETE (PDO)
