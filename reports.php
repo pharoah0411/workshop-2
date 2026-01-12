@@ -110,11 +110,19 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
     ?>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #333; }
-        /* Clean styles for the top navigation */
+        .top-nav { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 12px 30px; 
+            background: #1565c0; 
+            color: white; 
+        }
+
         .nav-links { 
             display: flex; 
-            align-items: center; 
-            gap: 5px; 
+            align-items: center; /* Vertically centers everything */
+            gap: 8px; /* Consistent spacing between buttons */
         }
 
         .nav-btn { 
@@ -122,38 +130,35 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
             text-decoration: none; 
             padding: 8px 12px; 
             border-radius: 6px; 
-            font-size: 14px;
+            font-size: 13px; /* Slightly smaller to fit everything in one row */
             font-weight: 500;
             display: flex;
             align-items: center;
             transition: 0.3s;
         }
 
-        .nav-btn.active { 
-            background: white; 
-            color: #1565c0; 
-            font-weight: bold; 
+        .nav-btn:hover { 
+            background: rgba(255, 255, 255, 0.2); 
         }
 
-        .logout-link {
-            background: #c62828; /* Professional red background */
-            color: white;
-            font-weight: bold;
-            margin-left: 10px;
-        }
-
-        .logout-link:hover {
-            background: #b71c1c;
-            transform: translateY(-2px);
-        }
-
-        /* This makes the 'Reports' button white as per your image */
+        /* Highlights the current 'Reports' page */
         .nav-btn.active { 
             background: white !important; 
             color: #1565c0 !important; 
             font-weight: bold; 
         }
 
+        /* Custom Logout style that is still aligned */
+        .logout-btn {
+            background: #c62828;
+            color: white !important;
+            font-weight: bold;
+            padding: 8px 15px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 13px;
+            margin-left: 5px;
+        }
 
         .header { border-bottom: 5px solid #1565c0; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
         .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 40px; }
@@ -227,15 +232,15 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
     <header class="top-nav no-print">
         <div>Welcome, <strong><?= htmlspecialchars($username) ?></strong> <small>(<?= $userRole ?>)</small></div>
         <div class="nav-links">
-            <a href="dashboard.php">🏠 Dashboard</a>
-            <a href="user_management.php" class="nav-btn">👤 User Management</a>
-            <a href="medDirectory.php" class="nav-btn">💊 Med Inventory</a>
-            <a href="Sales_Billing.php"  class="nav-btn">💰 Sales & Billing</a>
+            <a href="dashboard.php" class="nav-btn">🏠 Dashboard</a>
+            <a href="user_management.php" class="nav-btn">👤 Users</a>
+            <a href="medDirectory.php" class="nav-btn">💊 Inventory</a>
+            <a href="Sales_Billing.php" class="nav-btn">💰 Billing</a>
             <a href="reportDashboard.php" class="nav-btn active">📊 Reports</a>
             <a href="viewPrescription.php" class="nav-btn">📈 Prescription</a>
-            <a href="logout.php" style="border:1px solid white; padding:5px 10px; border-radius:5px;">Log Out</a>
+            <a href="logout.php" class="logout-btn">Log Out</a>
         </div>
-    </header>
+    </header>   
 
     <div class="export-section no-print">
         <div><h2 style="margin:0; color:#333;">Reports and Analytics</h2><p style="color:#666; font-size:0.9em;">Consolidated Pharmacy Data</p></div>
