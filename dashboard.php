@@ -8,6 +8,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// 🔐 Logged in but forced to reset password
+if (!empty($_SESSION['force_reset'])) {
+    header("Location: reset_password.php");
+    exit;
+}
+
 $userRole = $_SESSION['role'] ?? 'Guest';
 $username = $_SESSION['username'] ?? 'User';
 ?>
@@ -126,10 +132,6 @@ $username = $_SESSION['username'] ?? 'User';
             <span>Logged in as: **<?php echo htmlspecialchars($username); ?>** (Role: **<?php echo htmlspecialchars($userRole); ?>**)</span>
 
             <div style="display: flex; gap: 10px;">
-                <?php if(strtolower($userRole) === 'admin'): ?>
-                    <a href="view_audit.php" class="btn" style="background: #0066ff; color: white;">🛡️ Audit Trail</a>
-                    <a href="backup.php" class="btn" style="background: #28a745; color: white;">💾 Backup System</a>
-                <?php endif; ?>
          
                 <a href="logout.php" class="btn btn-secondary">Log Out</a>
             </div>

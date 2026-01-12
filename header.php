@@ -12,25 +12,27 @@
 
         .sidebar {
             width: 320px;
-            background: #0b2f6d;
+            background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%);
             height: 100vh;
             position: fixed;
             padding: 20px;
             color: white;
         }
 
-        .sidebar a {
-            display: block;
-            padding: 12px;
-            color: white;
-            text-decoration: none;
-            margin: 5px 0;
-            border-radius: 5px;
-        }
+       .sidebar a {
+    color: white;
+    text-decoration: none;
+    display: block;
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-weight: 500;
+    transition: background 0.3s;
+}
 
-        .sidebar a:hover {
-            background:#11408a;
-        }
+       .sidebar a:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
 
         .content {
             margin-left: 340px;
