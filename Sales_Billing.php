@@ -166,7 +166,7 @@ usort($prescriptions, function($a, $b) {
         <a href="medDirectory.php" class="nav-btn">💊 Med Inventory</a>
         <span class="nav-btn active">💰 Sales & Billing</span>
         <a href="reports.php" class="nav-btn">📊 Report</a>
-        <a href="viewPrescription.php" class="nav-btn">📈 Prescription Management</a>
+        <a href="viewPrescription.php" class="nav-btn">📈 Prescription</a>
     </div>
 </div>
 

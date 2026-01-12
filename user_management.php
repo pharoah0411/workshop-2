@@ -225,7 +225,7 @@ $userRole = $_SESSION['role'] ?? 'Admin';
         <a href="medDirectory.php">💊 Med Inventory</a>
         <a href="Sales_Billing.php">💰 Billing</a>
         <a href="reports.php">📊 Report</a>
-        <a href="prescriptionDashboard.php">📈 Prescription Management</a>
+        <a href="prescriptionDashboard.php">📈 Prescription</a>
     </div>
 
         <h1 class="page-title"><i class="fas fa-user-circle"></i> User Management Dashboard</h1>

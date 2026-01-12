@@ -228,8 +228,8 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
             <a href="medDirectory.php" class="nav-btn">💊 Med Inventory</a>
             <a href="Sales_Billing.php"  class="nav-btn">💰 Sales & Billing</a>
             <a href="reportDashboard.php" class="nav-btn active">📊 Reports</a>
-            <a href="viewPrescription.php" class="nav-btn">📈 Prescription Management</a>
-            <a href="logout.php" style="background:#c62828;">Logout</a>
+            <a href="viewPrescription.php" class="nav-btn">📈 Prescription</a>
+            <a href="logout.php" style="border:1px solid white; padding:5px 10px; border-radius:5px;">Log Out</a>
         </div>
     </header>
 
