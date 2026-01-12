@@ -119,7 +119,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['finalize_bill'])) {
 <body>
 
 <div class="top-nav">
-    <a href="dashboard.php" class="btn-dashboard">🏠 Back to Dashboard</a>
+    <a href="user_management.php" class="nav-btn">👤 User Management</a>
+    <a href="prescriptionDashboard.php" class="nav-btn">💊 Prescription</a>
+    <a href="Sales_Billing.php" class="nav-btn active">💰 Sales & Billing</a>
+    <a href="reportDashboard.php" class="nav-btn">📊 Report & Analysis</a>
+    <a href="viewPrescription.php" class="nav-btn">📈 Prescription Management</a>
 </div>
 
 <div class="invoice-card">
