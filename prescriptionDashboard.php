@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
-// --- Handle DELETE Prescription (FIXED: Handles Foreign Keys) ---
+// --- Handle DELETE Prescription ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_prescription') {
     $presc_id = intval($_POST['prescription_id']);
     $target_source = $_POST['source'] ?? '';
@@ -51,7 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $stmt->execute();
             }
             if ($target_source === 'Postgres' && isset($pg_conn)) {
-                // DELETE PAYMENTS FIRST to avoid Foreign Key constraint errors
                 $pg_conn->prepare("DELETE FROM public.payment WHERE prescription_id = ?")->execute([$presc_id]);
                 $pg_conn->prepare("DELETE FROM PRESCRIPTION_DETAIL WHERE PRESCRIPTION_ID = ?")->execute([$presc_id]);
                 $stmt = $pg_conn->prepare("DELETE FROM PRESCRIPTION WHERE PRESCRIPTION_ID = :id");
@@ -120,20 +119,11 @@ $prescriptions = array_filter($prescriptions, function($p) use ($search, $status
     return true;
 });
 
-// --- UPDATED SORTING LOGIC: PENDING ON TOP, COMPLETED ON BOTTOM ---
 usort($prescriptions, function($a, $b) {
-    // 1. Prioritize 'Pending' status
     $statusA = strtolower($a['STATUS'] ?? '');
     $statusB = strtolower($b['STATUS'] ?? '');
-
-    if ($statusA === 'pending' && $statusB !== 'pending') {
-        return -1; // $a comes first
-    }
-    if ($statusB === 'pending' && $statusA !== 'pending') {
-        return 1; // $b comes first
-    }
-
-    // 2. If statuses are the same (both Pending or both Completed), sort by ID descending
+    if ($statusA === 'pending' && $statusB !== 'pending') return -1;
+    if ($statusB === 'pending' && $statusA !== 'pending') return 1;
     return (int)($b['PRESCRIPTION_ID'] ?? 0) - (int)($a['PRESCRIPTION_ID'] ?? 0);
 });
 ?>
@@ -196,7 +186,10 @@ usort($prescriptions, function($a, $b) {
 
     <div class="content">
         <div class="controls">
-            <a href="createPrescription.php" class="btn btn-primary"><i class="fas fa-plus"></i> New Prescription</a>
+            <?php if (strtolower($role) !== 'admin'): ?>
+                <a href="createPrescription.php" class="btn btn-primary"><i class="fas fa-plus"></i> New Prescription</a>
+            <?php endif; ?>
+            
             <form method="GET" style="display:flex; gap:10px; flex:1;">
                 <input type="text" name="search" placeholder="Search Patient or ID..." value="<?= htmlspecialchars($search) ?>" style="flex:1; padding:10px; border-radius:6px; border:1px solid #ddd;">
                 <select name="status" style="padding:10px; border-radius:6px; border:1px solid #ddd;">
