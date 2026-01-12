@@ -110,6 +110,47 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
     ?>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #333; }
+        /* Clean styles for the top navigation */
+        .top-nav { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 15px 30px; 
+            background: #1565c0; 
+            color: white; 
+        }
+
+        .nav-links { display: flex; gap: 8px; align-items: center; }
+
+        .nav-btn { 
+            color: white; 
+            text-decoration: none; 
+            font-weight: 500; 
+            transition: 0.3s; 
+            padding: 8px 12px; 
+            border-radius: 6px; 
+            font-size: 14px;
+        }
+
+        .nav-btn:hover { background: rgba(255,255,255,0.2); }
+
+        /* This makes the 'Reports' button white as per your image */
+        .nav-btn.active { 
+            background: white !important; 
+            color: #1565c0 !important; 
+            font-weight: bold; 
+        }
+
+        .logout-btn { 
+            background: #c62828; 
+            color: white; 
+            padding: 8px 15px; 
+            border-radius: 6px; 
+            text-decoration: none; 
+            font-size: 14px; 
+            font-weight: bold;
+            margin-left: 10px;
+        }
         .header { border-bottom: 5px solid #1565c0; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
         .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 40px; }
         .p-card { background: #f8f9fa; padding: 20px; border: 1px solid #ddd; border-radius: 8px; text-align: center; }
@@ -183,7 +224,11 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
         <div>Welcome, <strong><?= htmlspecialchars($username) ?></strong> <small>(<?= $userRole ?>)</small></div>
         <div class="nav-links">
             <a href="dashboard.php">🏠 Dashboard</a>
-            <a href="medDirectory.php">📦 Medicines</a>
+            <a href="user_management.php" class="nav-btn">👤 User Management</a>
+            <a href="medDirectory.php" class="nav-btn">💊 Med Inventory</a>
+            <a href="Sales_Billing.php"  class="nav-btn">💰 Sales & Billing</a>
+            <a href="reportDashboard.php" class="nav-btn active">📊 Reports</a>
+            <a href="viewPrescription.php" class="nav-btn">📈 Prescription Management</a>
             <a href="logout.php" style="background:#c62828;">Logout</a>
         </div>
     </header>

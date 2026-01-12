@@ -222,10 +222,10 @@ $userRole = $_SESSION['role'] ?? 'Admin';
     <div class="system-nav">
         <a href="dashboard.php">🏠 Home</a>
         <a href="user_management.php" class="active">👤 User Management</a>
-        <a href="prescriptionDashboard.php">💊 Prescription</a>
+        <a href="medDirectory.php">💊 Med Inventory</a>
         <a href="Sales_Billing.php">💰 Billing</a>
-        <a href="reportDashboard.php">📊 Report</a>
-        <a href="viewPrescription.php">📈 Prescription Management</a>
+        <a href="reports.php">📊 Report</a>
+        <a href="prescriptionDashboard.php">📈 Prescription Management</a>
     </div>
 
         <h1 class="page-title"><i class="fas fa-user-circle"></i> User Management Dashboard</h1>
