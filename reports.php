@@ -111,28 +111,41 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #333; }
         /* Clean styles for the top navigation */
-        .top-nav { 
+        .nav-links { 
             display: flex; 
-            justify-content: space-between; 
             align-items: center; 
-            padding: 15px 30px; 
-            background: #1565c0; 
-            color: white; 
+            gap: 5px; 
         }
-
-        .nav-links { display: flex; gap: 8px; align-items: center; }
 
         .nav-btn { 
             color: white; 
             text-decoration: none; 
-            font-weight: 500; 
-            transition: 0.3s; 
             padding: 8px 12px; 
             border-radius: 6px; 
             font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            transition: 0.3s;
         }
 
-        .nav-btn:hover { background: rgba(255,255,255,0.2); }
+        .nav-btn.active { 
+            background: white; 
+            color: #1565c0; 
+            font-weight: bold; 
+        }
+
+        .logout-link {
+            background: #c62828; /* Professional red background */
+            color: white;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .logout-link:hover {
+            background: #b71c1c;
+            transform: translateY(-2px);
+        }
 
         /* This makes the 'Reports' button white as per your image */
         .nav-btn.active { 
@@ -141,16 +154,7 @@ if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
             font-weight: bold; 
         }
 
-        .logout-btn { 
-            background: #c62828; 
-            color: white; 
-            padding: 8px 15px; 
-            border-radius: 6px; 
-            text-decoration: none; 
-            font-size: 14px; 
-            font-weight: bold;
-            margin-left: 10px;
-        }
+
         .header { border-bottom: 5px solid #1565c0; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
         .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 40px; }
         .p-card { background: #f8f9fa; padding: 20px; border: 1px solid #ddd; border-radius: 8px; text-align: center; }
