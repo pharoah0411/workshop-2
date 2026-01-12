@@ -164,6 +164,39 @@ $userRole = $_SESSION['role'] ?? 'Admin';
         color: white;
         transform: scale(1.05);
     }
+    /* Top System Navigation (Between Modules) */
+    .system-nav {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-start;
+        padding: 15px 20px;
+        margin-bottom: 35px;
+        background: white;
+        border-radius: 14px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    }
+
+    .system-nav a {
+        background: #f5f7fb;
+        color: #007bff;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 10px 18px;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        border: 1px solid transparent;
+    }
+
+    .system-nav a:hover {
+        background: #e8f1ff;
+        transform: translateY(-2px);
+    }
+
+    .system-nav a.active {
+        background: #007bff;
+        color: white;
+}
+
 </style>
 </head>
 <body>
@@ -185,6 +218,15 @@ $userRole = $_SESSION['role'] ?? 'Admin';
             <span>Welcome, <strong><?= htmlspecialchars($username) ?></strong></span>
             <a href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
         </div>
+            <!-- SYSTEM NAVIGATION -->
+    <div class="system-nav">
+        <a href="dashboard.php">🏠 Home</a>
+        <a href="user_management.php" class="active">👤 User Management</a>
+        <a href="prescriptionDashboard.php">💊 Prescription</a>
+        <a href="Sales_Billing.php">💰 Billing</a>
+        <a href="reportDashboard.php">📊 Report</a>
+        <a href="viewPrescription.php">📈 Prescription Management</a>
+    </div>
 
         <h1 class="page-title"><i class="fas fa-user-circle"></i> User Management Dashboard</h1>
 

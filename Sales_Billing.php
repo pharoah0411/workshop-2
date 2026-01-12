@@ -164,8 +164,8 @@ usort($prescriptions, function($a, $b) {
         <a href="dashboard.php">🏠 Home</a>
         <a href="user_management.php" class="nav-btn">👤 User Management</a>
         <a href="prescriptionDashboard.php" class="nav-btn">💊 Prescription</a>
-        <a href="Sales_Billing.php" class="nav-btn active">💰 Sales & Billing</a>
-        <a href="reportDashboard.php" class="nav-btn">📊 Report & Analysis</a>
+        <span class="nav-btn active">💰 Sales & Billing</span>
+        <a href="reportDashboard.php" class="nav-btn">📊 Report</a>
         <a href="viewPrescription.php" class="nav-btn">📈 Prescription Management</a>
     </div>
 </div>
