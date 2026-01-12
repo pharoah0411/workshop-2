@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once 'session_check.php'; // Add session check like other pages
 require_once 'connection.php';
 
 // Check if user is NOT logged in. If not, redirect to login page.
@@ -339,204 +340,112 @@ function createExcelBackup($db_type) {
     }
 }
 
-// ⭐⭐⭐ RECOVER/RESTORE FUNCTION (For MySQL only - since it's your local DB) ⭐⭐⭐
-function restoreDatabaseBackup($backup_file) {
-    global $mysql_conn2, $logs_dir, $username;
+// ⭐⭐⭐ RESTORE DATABASE FUNCTION ⭐⭐⭐
+function restoreDatabase($backup_file, $db_type) {
+    global $pdo, $mysql_conn2, $pg_conn, $db_backup_dir, $logs_dir, $username;
+    
+    $full_path = $db_backup_dir . $backup_file;
+    $log_file = $logs_dir . 'restore_log_' . date('Y-m-d_H-i-s') . '.txt';
+    
+    if (!file_exists($full_path)) {
+        return ['success' => false, 'message' => '❌ Backup file not found'];
+    }
     
     try {
-        $log_file = $logs_dir . "restore_log_" . date('Y-m-d_H-i-s') . ".txt";
-        
-        // Check file type
         $file_ext = strtolower(pathinfo($backup_file, PATHINFO_EXTENSION));
         
-        if ($file_ext === 'zip') {
-            // Handle ZIP/CSV restore
-            return restoreFromCSV($backup_file);
+        // Log start
+        $log_content = "🔧 RESTORE STARTED: " . date('Y-m-d H:i:s') . "\n";
+        $log_content .= "User: " . $username . "\n";
+        $log_content .= "File: " . $backup_file . "\n";
+        $log_content .= "Database: " . strtoupper($db_type) . "\n";
+        $log_content .= "File Size: " . filesize($full_path) . " bytes\n\n";
+        
+        $success = false;
+        $records_restored = 0;
+        $errors = [];
+        
+        if ($file_ext === 'sql') {
+            // SQL file restore
+            $sql_content = file_get_contents($full_path);
+            $queries = array_filter(array_map('trim', explode(';', $sql_content)));
+            
+            if ($db_type === 'mysql' && $mysql_conn2) {
+                // Begin transaction
+                $mysql_conn2->begin_transaction();
+                
+                // Temporarily disable foreign key checks
+                $mysql_conn2->query("SET FOREIGN_KEY_CHECKS = 0");
+                
+                // Clear existing data (WARNING: This deletes all data!)
+                $tables = ['PRESCRIPTION_DETAIL', 'PRESCRIPTION', 'MEDICINE', 'PATIENT', 'USER'];
+                foreach ($tables as $table) {
+                    $mysql_conn2->query("DELETE FROM `$table`");
+                    $mysql_conn2->query("ALTER TABLE `$table` AUTO_INCREMENT = 1");
+                }
+                
+                // Execute INSERT queries only
+                foreach ($queries as $query) {
+                    if (!empty($query) && stripos($query, 'INSERT') === 0) {
+                        if ($mysql_conn2->query($query)) {
+                            $records_restored += $mysql_conn2->affected_rows;
+                        } else {
+                            $errors[] = "MySQL Error: " . $mysql_conn2->error;
+                        }
+                    }
+                }
+                
+                $mysql_conn2->query("SET FOREIGN_KEY_CHECKS = 1");
+                $mysql_conn2->commit();
+                $success = true;
+            } else {
+                $errors[] = "Only MySQL restoration is currently supported";
+            }
+        } elseif ($file_ext === 'zip') {
+            $errors[] = "CSV/ZIP restoration not yet implemented. Please use SQL files.";
+        }
+        
+        // Log results
+        if ($success) {
+            $log_content .= "✅ RESTORE COMPLETED SUCCESSFULLY\n";
+            $log_content .= "Records restored: " . $records_restored . "\n";
+            $log_content .= "Errors: " . count($errors) . "\n";
+            
+            if (!empty($errors)) {
+                $log_content .= "\nERROR DETAILS:\n" . implode("\n", $errors) . "\n";
+            }
+            
+            file_put_contents($log_file, $log_content);
+            
+            return [
+                'success' => true,
+                'message' => "✅ <strong>DATABASE RESTORED SUCCESSFULLY!</strong><br>
+                             File: <strong>" . $backup_file . "</strong><br>
+                             Database: " . strtoupper($db_type) . "<br>
+                             Records restored: " . $records_restored . "<br>
+                             Time: " . date('H:i:s')
+            ];
         } else {
-            // Handle SQL restore
-            return restoreFromSQL($backup_file);
+            $log_content .= "❌ RESTORE FAILED\n";
+            $log_content .= "Errors: " . implode(", ", $errors) . "\n";
+            file_put_contents($log_file, $log_content);
+            
+            return [
+                'success' => false,
+                'message' => "❌ Restore failed: " . implode(", ", $errors)
+            ];
         }
         
     } catch (Exception $e) {
-        $error_log = "❌ Restore FAILED: " . date('Y-m-d H:i:s') . "\n";
+        $error_log = "❌ RESTORE FAILED: " . date('Y-m-d H:i:s') . "\n";
         $error_log .= "Error: " . $e->getMessage() . "\n";
-        file_put_contents($logs_dir . "error_log.txt", $error_log, FILE_APPEND);
+        file_put_contents($logs_dir . "restore_error_log.txt", $error_log, FILE_APPEND);
         
         return [
             'success' => false,
             'message' => "❌ Restore error: " . $e->getMessage()
         ];
     }
-}
-
-function restoreFromSQL($backup_file) {
-    global $mysql_conn2, $logs_dir, $username;
-    
-    $log_file = $logs_dir . "restore_log_" . date('Y-m-d_H-i-s') . ".txt";
-    
-    // Read backup file
-    $backup_content = file_get_contents($backup_file);
-    if (!$backup_content) {
-        return [
-            'success' => false,
-            'message' => "❌ Cannot read backup file."
-        ];
-    }
-    
-    // Log restore start
-    $log_message = "🔄 SQL Restore STARTED: " . date('Y-m-d H:i:s') . "\n";
-    $log_message .= "User: " . $username . "\n";
-    $log_message .= "File: " . basename($backup_file) . "\n";
-    file_put_contents($log_file, $log_message, FILE_APPEND);
-    
-    // Split SQL statements
-    $sql_statements = explode(";", $backup_content);
-    $restored_tables = [];
-    $restored_records = 0;
-    
-    // Begin transaction
-    $mysql_conn2->begin_transaction();
-    
-    // Clear existing data first
-    $tables = ['PRESCRIPTION_DETAIL', 'PRESCRIPTION', 'MEDICINE', 'PATIENT', 'USER'];
-    foreach ($tables as $table) {
-        $delete_query = "DELETE FROM `$table`";
-        if ($mysql_conn2->query($delete_query)) {
-            $log_message = "Cleared table: $table\n";
-            file_put_contents($log_file, $log_message, FILE_APPEND);
-        }
-    }
-    
-    // Execute each SQL statement
-    foreach ($sql_statements as $sql) {
-        $sql = trim($sql);
-        if (!empty($sql) && stripos($sql, 'INSERT INTO') === 0) {
-            if ($mysql_conn2->query($sql)) {
-                $restored_records++;
-                
-                // Extract table name
-                if (preg_match('/INSERT INTO `?(\w+)`?/i', $sql, $matches)) {
-                    $table_name = $matches[1];
-                    if (!in_array($table_name, $restored_tables)) {
-                        $restored_tables[] = $table_name;
-                    }
-                }
-            } else {
-                throw new Exception("Failed to execute SQL: " . $mysql_conn2->error);
-            }
-        }
-    }
-    
-    // Commit transaction
-    $mysql_conn2->commit();
-    
-    // Log success
-    $log_message = "✅ SQL Restore COMPLETED: " . date('Y-m-d H:i:s') . "\n";
-    $log_message .= "Tables restored: " . count($restored_tables) . "\n";
-    $log_message .= "Records restored: " . $restored_records . "\n";
-    file_put_contents($log_file, $log_message, FILE_APPEND);
-    
-    return [
-        'success' => true,
-        'message' => "✅ <strong>DATABASE RESTORED FROM SQL!</strong><br>
-                     File: <strong>" . basename($backup_file) . "</strong><br>
-                     Format: SQL<br>
-                     Tables: " . count($restored_tables) . "<br>
-                     Records: " . $restored_records,
-        'tables' => $restored_tables,
-        'records' => $restored_records
-    ];
-}
-
-function restoreFromCSV($backup_file) {
-    global $mysql_conn2, $logs_dir, $username;
-    
-    $log_file = $logs_dir . "restore_log_" . date('Y-m-d_H-i-s') . ".txt";
-    
-    // Log restore start
-    $log_message = "🔄 CSV Restore STARTED: " . date('Y-m-d H:i:s') . "\n";
-    $log_message .= "User: " . $username . "\n";
-    $log_message .= "File: " . basename($backup_file) . "\n";
-    file_put_contents($log_file, $log_message, FILE_APPEND);
-    
-    $restored_tables = [];
-    $restored_records = 0;
-    
-    // Begin transaction
-    $mysql_conn2->begin_transaction();
-    
-    // Clear existing data first
-    $tables = ['PRESCRIPTION_DETAIL', 'PRESCRIPTION', 'MEDICINE', 'PATIENT', 'USER'];
-    foreach ($tables as $table) {
-        $delete_query = "DELETE FROM `$table`";
-        if ($mysql_conn2->query($delete_query)) {
-            $log_message = "Cleared table: $table\n";
-            file_put_contents($log_file, $log_message, FILE_APPEND);
-        }
-    }
-    
-    // Extract ZIP and process CSV files
-    $zip = new ZipArchive();
-    if ($zip->open($backup_file) === TRUE) {
-        for ($i = 0; $i < $zip->numFiles; $i++) {
-            $filename = $zip->getNameIndex($i);
-            
-            // Check if it's a CSV file
-            if (pathinfo($filename, PATHINFO_EXTENSION) === 'csv') {
-                $table_name = pathinfo($filename, PATHINFO_FILENAME);
-                $csv_content = $zip->getFromIndex($i);
-                
-                // Parse CSV
-                $lines = explode("\n", $csv_content);
-                $headers = str_getcsv($lines[0]);
-                
-                // Process each row
-                for ($j = 1; $j < count($lines); $j++) {
-                    if (empty(trim($lines[$j]))) continue;
-                    
-                    $row = str_getcsv($lines[$j]);
-                    $values = [];
-                    
-                    foreach ($row as $value) {
-                        if ($value === '') {
-                            $values[] = 'NULL';
-                        } else {
-                            $values[] = "'" . $mysql_conn2->real_escape_string($value) . "'";
-                        }
-                    }
-                    
-                    $sql = "INSERT INTO `$table_name` (" . implode(', ', $headers) . ") VALUES (" . implode(', ', $values) . ")";
-                    if ($mysql_conn2->query($sql)) {
-                        $restored_records++;
-                        if (!in_array($table_name, $restored_tables)) {
-                            $restored_tables[] = $table_name;
-                        }
-                    }
-                }
-            }
-        }
-        $zip->close();
-    }
-    
-    // Commit transaction
-    $mysql_conn2->commit();
-    
-    // Log success
-    $log_message = "✅ CSV Restore COMPLETED: " . date('Y-m-d H:i:s') . "\n";
-    $log_message .= "Tables restored: " . count($restored_tables) . "\n";
-    $log_message .= "Records restored: " . $restored_records . "\n";
-    file_put_contents($log_file, $log_message, FILE_APPEND);
-    
-    return [
-        'success' => true,
-        'message' => "✅ <strong>DATABASE RESTORED FROM CSV!</strong><br>
-                     File: <strong>" . basename($backup_file) . "</strong><br>
-                     Format: CSV/Excel<br>
-                     Tables: " . count($restored_tables) . "<br>
-                     Records: " . $restored_records,
-        'tables' => $restored_tables,
-        'records' => $restored_records
-    ];
 }
 
 // Handle backup creation
@@ -554,50 +463,67 @@ if (isset($_POST['create_backup'])) {
     $message_type = $result['success'] ? 'success' : 'error';
 }
 
-// Handle file restore (only for MySQL backups)
+// Handle restore action
 if (isset($_POST['restore_backup'])) {
-    // Handle uploaded file
-    if (isset($_FILES['backup_file']) && $_FILES['backup_file']['error'] === UPLOAD_ERR_OK) {
-        $uploaded_file = $_FILES['backup_file']['tmp_name'];
-        $result = restoreDatabaseBackup($uploaded_file);
+    $backup_file = $_POST['backup_file'] ?? '';
+    $database_type = $_POST['database_type'] ?? 'mysql';
+    $confirmation = $_POST['confirmation'] ?? '';
+    
+    if (empty($backup_file)) {
+        $message = '❌ Please select a backup file';
+        $message_type = 'error';
+    } elseif ($confirmation !== 'YES') {
+        $message = '❌ You must type YES to confirm restoration';
+        $message_type = 'error';
+    } else {
+        $result = restoreDatabase($backup_file, $database_type);
         $message = $result['message'];
         $message_type = $result['success'] ? 'success' : 'error';
-    } else {
-        $message = "❌ Please select a valid backup file to upload.";
-        $message_type = 'error';
     }
 }
 
-// Handle file restore from existing backups (only MySQL files)
-if (isset($_GET['restore'])) {
-    $filename = $_GET['restore'];
-    $filepath = $db_backup_dir . basename($filename);
-    
-    // Check if it's a MySQL backup (only MySQL can be restored locally)
-    if (strpos($filename, '_mysql_') === false) {
-        $message = "❌ Only MySQL backups can be restored on this system.<br>SQL Server and PostgreSQL backups are for other team members.";
-        $message_type = 'error';
-    } elseif (file_exists($filepath)) {
-        $result = restoreDatabaseBackup($filepath);
-        $message = $result['message'];
-        $message_type = $result['success'] ? 'success' : 'error';
+// Handle file upload for restore
+if (isset($_POST['upload_restore'])) {
+    if (isset($_FILES['backup_file']) && $_FILES['backup_file']['error'] === UPLOAD_ERR_OK) {
+        $file_tmp = $_FILES['backup_file']['tmp_name'];
+        $file_name = basename($_FILES['backup_file']['name']);
+        $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+        
+        // Validate file type
+        if ($file_ext === 'sql' || $file_ext === 'zip') {
+            $new_filename = 'uploaded_' . date('Y-m-d_H-i-s') . '_' . $file_name;
+            $destination = $db_backup_dir . $new_filename;
+            
+            if (move_uploaded_file($file_tmp, $destination)) {
+                $message = '✅ File uploaded successfully. You can now restore from it.';
+                $message_type = 'success';
+            } else {
+                $message = '❌ Failed to upload file';
+                $message_type = 'error';
+            }
+        } else {
+            $message = '❌ Invalid file type. Only .sql or .zip files allowed';
+            $message_type = 'error';
+        }
     } else {
-        $message = "❌ Backup file not found: " . htmlspecialchars($filename);
+        $message = '❌ Please select a file to upload';
         $message_type = 'error';
     }
 }
 
 // Handle file deletion
 if (isset($_GET['delete'])) {
-    $filename = $_GET['delete'];
-    $filepath = $db_backup_dir . basename($filename);
+    $file_to_delete = $_GET['delete'];
+    $file_path = $db_backup_dir . $file_to_delete;
     
-    if (file_exists($filepath) && unlink($filepath)) {
-        $message = "✅ Backup file deleted: " . htmlspecialchars($filename);
-        $message_type = 'success';
-    } else {
-        $message = "❌ Failed to delete backup file.";
-        $message_type = 'error';
+    if (file_exists($file_path)) {
+        if (unlink($file_path)) {
+            $message = '✅ Backup file deleted successfully';
+            $message_type = 'success';
+        } else {
+            $message = '❌ Failed to delete file';
+            $message_type = 'error';
+        }
     }
 }
 
@@ -623,421 +549,1315 @@ usort($backup_files, function($a, $b) use ($db_backup_dir) {
 $mysql_available = ($mysql_conn2 && $mysql_conn2 instanceof mysqli);
 $sqlserver_available = (isset($pdo) && $pdo instanceof PDO);
 $postgresql_available = (isset($pg_conn) && $pg_conn instanceof PDO);
+
+// Calculate backup stats
+$total_size = 0;
+foreach ($backup_files as $file) {
+    $filepath = $db_backup_dir . $file;
+    if (file_exists($filepath)) {
+        $total_size += filesize($filepath);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Backup & Restore - Pharmacy System</title>
+    <title>PharmaCare - Backup & Restore System</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); min-height: 100vh; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); overflow: hidden; }
-        
-        .header { 
-            background: linear-gradient(135deg, #0066ff 0%, #0099ff 100%); 
-            color: white; 
-            padding: 25px 30px; 
-            text-align: center; 
-        }
-        .header h1 { font-size: 2em; margin: 0; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2); }
-        
-        .controls-top {
-            padding: 20px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: white;
-            border-bottom: 1px solid #eee;
+        /* ===== DASHBOARD THEME STYLES ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         
-        .btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-size: 0.95em;
-            font-weight: 500;
-            transition: all 0.3s ease;
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0d1b4e 0%, #1a2980 30%, #26d0ce 100%);
+            background-attachment: fixed;
+            color: #333;
+            min-height: 100vh;
+            padding-top: 100px; /* Space for fixed menu */
+        }
+        
+        a {
             text-decoration: none;
+            color: inherit;
+        }
+        
+        /* ===== OVAL NAVIGATION MENU ===== */
+        .oval-nav-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            width: auto;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .oval-nav-container.scrolled {
+            top: 10px;
+            transform: translateX(-50%) scale(0.95);
+        }
+        
+        .oval-nav {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border-radius: 50px;
+            padding: 8px 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 100, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .oval-nav.scrolled {
+            padding: 6px 20px;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 8px 25px rgba(0, 0, 100, 0.15);
+        }
+        
+        /* ===== NAVIGATION MENU ===== */
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            gap: 2px;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .nav-item {
+            position: relative;
+        }
+        
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            color: #1a2980;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            border-radius: 30px;
+            white-space: nowrap;
+        }
+        
+        .nav-link:hover {
+            background: linear-gradient(135deg, rgba(26, 41, 128, 0.1) 0%, rgba(38, 208, 206, 0.1) 100%);
+            color: #1a2980;
+            transform: translateY(-1px);
+        }
+        
+        .nav-link i {
+            color: #26d0ce;
+            font-size: 14px;
+            width: 18px;
+            text-align: center;
+        }
+        
+        /* ===== DROPDOWN MENUS ===== */
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            min-width: 230px;
+            box-shadow: 0 15px 35px rgba(0, 0, 100, 0.2);
+            border-radius: 15px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-15px) scale(0.95);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            border: 1px solid rgba(26, 41, 128, 0.1);
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .nav-item:hover .dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0) scale(1);
+        }
+        
+        .dropdown-header {
+            padding: 12px 18px;
+            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 18px;
+            color: #555;
+            border-bottom: 1px solid #f0f7ff;
+            transition: all 0.2s ease;
+            font-size: 13px;
+        }
+        
+        .dropdown-item:hover {
+            background: linear-gradient(135deg, #f9fbff 0%, #e6f0ff 100%);
+            color: #1a2980;
+            padding-left: 22px;
+            border-left: 3px solid #26d0ce;
+        }
+        
+        .dropdown-item i {
+            color: #26d0ce;
+            width: 16px;
+            font-size: 13px;
+        }
+        
+        /* ===== USER SECTION ===== */
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: 20px;
+            padding-left: 20px;
+            border-left: 1px solid rgba(26, 41, 128, 0.2);
+        }
+        
+        .user-badge {
+            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 12px;
+            box-shadow: 0 4px 12px rgba(26, 41, 128, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            white-space: nowrap;
+        }
+        
+        .logout-btn {
+            background: #ffeaea;
+            color: #d32f2f;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        
+        .logout-btn:hover {
+            background: #ffcccc;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(211, 47, 47, 0.3);
+        }
+        
+        /* ===== PAGE HEADER ===== */
+        .page-header {
+            text-align: center;
+            padding: 30px 20px 20px;
+            margin-bottom: 30px;
+        }
+        
+        .page-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: white;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            line-height: 1.1;
+        }
+        
+        .page-subtitle {
+            font-size: 1.1rem;
+            color: rgba(255, 255, 255, 0.85);
+            font-weight: 300;
+            letter-spacing: 0.5px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* ===== MAIN CONTENT ===== */
+        .main-content {
+            padding: 0 30px 40px;
+        }
+        
+        /* ===== DATABASE STATUS CARDS ===== */
+        .status-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 40px;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            max-width: 1300px;
+            width: 100%;
+        }
+        
+        .status-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px 20px;
+            text-align: center;
+            box-shadow: 0 6px 18px rgba(0, 0, 100, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .status-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #1a2980 0%, #26d0ce 100%);
+            border-radius: 15px 15px 0 0;
+        }
+        
+        .status-card:hover {
+            transform: translateY(-5px);
+            background: white;
+            box-shadow: 0 15px 35px rgba(0, 0, 100, 0.2);
+        }
+        
+        .status-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin: 0 auto 15px;
+            background: linear-gradient(135deg, rgba(26, 41, 128, 0.1) 0%, rgba(38, 208, 206, 0.1) 100%);
+            color: #1a2980;
+            transition: all 0.25s ease;
+        }
+        
+        .status-card:hover .status-icon {
+            transform: scale(1.1);
+            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+            color: white;
+        }
+        
+        .status-name {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #1a2980;
+        }
+        
+        .status-indicator {
             display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .status-online {
+            background: rgba(76, 175, 80, 0.15);
+            color: #2e7d32;
+            border: 1px solid rgba(76, 175, 80, 0.2);
+        }
+        
+        .status-offline {
+            background: rgba(244, 67, 54, 0.15);
+            color: #c62828;
+            border: 1px solid rgba(244, 67, 54, 0.2);
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .dot-online {
+            background: #4CAF50;
+        }
+        
+        .dot-offline {
+            background: #f44336;
+        }
+        
+        .status-description {
+            color: #666;
+            font-size: 13px;
+        }
+        
+        /* ===== BACKUP CONTROL PANEL ===== */
+        .backup-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 6px 18px rgba(0, 0, 100, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* ===== MESSAGE ALERT ===== */
+        .alert-message {
+            background: white;
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            border-left: 4px solid #26d0ce;
+            box-shadow: 0 4px 15px rgba(0, 0, 100, 0.08);
+            font-weight: 500;
+        }
+        
+        .alert-success {
+            border-left-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.05);
+        }
+        
+        .alert-error {
+            border-left-color: #f44336;
+            background: rgba(244, 67, 54, 0.05);
+        }
+        
+        /* ===== TAB STYLES ===== */
+        .tab-navigation {
+            display: flex;
+            border-bottom: 2px solid rgba(26, 41, 128, 0.1);
+            margin-bottom: 30px;
+            overflow-x: auto;
+        }
+        
+        .tab-button {
+            padding: 12px 25px;
+            background: none;
+            border: none;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+            display: flex;
             align-items: center;
             gap: 8px;
         }
-        .btn-primary { background: #0066ff; color: white; }
-        .btn-secondary { background: #6c757d; color: white; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-warning { background: #ffc107; color: #212529; }
-        .btn-info { background: #17a2b8; color: white; }
         
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        
-        .content { padding: 30px; }
-        
-        .card {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            padding: 25px;
-            border-top: 4px solid #0066ff;
+        .tab-button:hover {
+            color: #1a2980;
         }
         
-        .card h2 {
-            color: #0066ff;
-            margin-bottom: 20px;
+        .tab-button.active {
+            color: #1a2980;
+            border-bottom: 3px solid #26d0ce;
+        }
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* ===== BACKUP FORM ===== */
+        .backup-form {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 100, 0.08);
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #1a2980;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid rgba(26, 41, 128, 0.1);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus {
+            border-color: #26d0ce;
+            box-shadow: 0 0 0 3px rgba(38, 208, 206, 0.2);
+            outline: none;
+        }
+        
+        /* ===== FORMAT CARDS ===== */
+        .format-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .format-card {
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        
+        .format-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 100, 0.15);
+        }
+        
+        .format-card.selected {
+            border-color: #26d0ce;
+            background: linear-gradient(135deg, #f9fbff 0%, #e6f0ff 100%);
+        }
+        
+        .format-card.sql {
+            background: rgba(26, 41, 128, 0.05);
+            border: 2px solid rgba(26, 41, 128, 0.2);
+        }
+        
+        .format-card.excel {
+            background: rgba(38, 208, 206, 0.05);
+            border: 2px solid rgba(38, 208, 206, 0.2);
+        }
+        
+        .format-icon {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .format-card.sql .format-icon {
+            color: #1a2980;
+        }
+        
+        .format-card.excel .format-icon {
+            color: #26d0ce;
+        }
+        
+        .format-title {
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #1a2980;
+        }
+        
+        .format-features {
+            list-style: none;
+        }
+        
+        .format-features li {
+            padding: 5px 0;
+            color: #666;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .format-features li:before {
+            content: '✓';
+            color: #26d0ce;
+            font-weight: bold;
+        }
+        
+        /* ===== BUTTONS ===== */
+        .btn-backup {
+            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+        }
+        
+        .btn-backup:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(26, 41, 128, 0.3);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(220, 53, 69, 0.3);
+        }
+        
+        /* ===== BACKUP FILES TABLE ===== */
+        .files-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 100, 0.08);
+        }
+        
+        .files-table thead {
+            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+            color: white;
+        }
+        
+        .files-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+            border: none;
+        }
+        
+        .files-table td {
+            padding: 15px;
+            border-bottom: 1px solid rgba(26, 41, 128, 0.1);
+            font-size: 13px;
+        }
+        
+        .files-table tbody tr {
+            transition: all 0.2s ease;
+        }
+        
+        .files-table tbody tr:hover {
+            background: linear-gradient(135deg, #f9fbff 0%, #e6f0ff 100%);
+        }
+        
+        /* ===== BADGES ===== */
+        .file-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .badge-mysql {
+            background: linear-gradient(135deg, #4CAF50 0%, #2e7d32 100%);
+        }
+        
+        .badge-sqlserver {
+            background: linear-gradient(135deg, #2196F3 0%, #0d47a1 100%);
+        }
+        
+        .badge-postgresql {
+            background: linear-gradient(135deg, #673AB7 0%, #311b92 100%);
+        }
+        
+        .badge-format {
+            background: linear-gradient(135deg, #FF9800 0%, #ef6c00 100%);
+        }
+        
+        /* ===== ACTION BUTTONS ===== */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-action {
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            text-decoration: none;
+        }
+        
+        .btn-download {
+            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+            color: white;
+        }
+        
+        .btn-delete {
+            background: linear-gradient(135deg, #f44336 0%, #c62828 100%);
+            color: white;
+        }
+        
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* ===== STATS CARDS ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin: 40px 0;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px 20px;
+            text-align: center;
+            box-shadow: 0 6px 18px rgba(0, 0, 100, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            background: white;
+            box-shadow: 0 15px 35px rgba(0, 0, 100, 0.2);
+        }
+        
+        .stat-value {
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 5px;
+            color: #1a2980;
+            line-height: 1;
+            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        
+        /* ===== RESTORE WARNING ===== */
+        .restore-warning {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+        
+        .restore-warning h4 {
+            color: #856404;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
             gap: 10px;
         }
         
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
-        .form-control {
-            width: 100%;
-            padding: 10px 15px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 1em;
-        }
-        
-        .db-status {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-bottom: 25px;
-        }
-        
-        .db-card {
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        .db-card.mysql { background: #e8f5e9; border: 2px solid #4caf50; }
-        .db-card.sqlserver { background: #e3f2fd; border: 2px solid #2196f3; }
-        .db-card.postgresql { background: #f3e5f5; border: 2px solid #9c27b0; }
-        
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-        .status-online { background: #4caf50; }
-        .status-offline { background: #f44336; }
-        
-        .tabs {
-            display: flex;
-            border-bottom: 1px solid #ddd;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        .tab {
-            padding: 12px 24px;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            white-space: nowrap;
-        }
-        .tab.active {
-            border-bottom: 3px solid #0066ff;
-            color: #0066ff;
-            font-weight: 600;
-        }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        
-        .message {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            animation: fadeIn 0.5s;
-        }
-        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .message.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
-        .message.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .format-info {
-            display: flex;
-            gap: 20px;
-            margin-top: 15px;
-        }
-        .format-card {
-            flex: 1;
-            padding: 15px;
-            border-radius: 8px;
-        }
-        .format-card.sql { border: 2px solid #0066ff; background: #e3f2fd; }
-        .format-card.excel { border: 2px solid #28a745; background: #e8f5e9; }
-        
-        .file-type-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 0.8em;
+        .confirmation-input {
+            border: 2px solid #dc3545 !important;
             font-weight: bold;
-            margin-left: 10px;
-        }
-        .badge-mysql { background: #4caf50; color: white; }
-        .badge-sqlserver { background: #2196f3; color: white; }
-        .badge-postgresql { background: #9c27b0; color: white; }
-        .badge-excel { background: #28a745; color: white; }
-        .badge-sql { background: #6c757d; color: white; }
-        
-        .backup-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        .backup-table th, .backup-table td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        .backup-table th {
-            background: #f8f9fa;
-            color: #333;
-            font-weight: 600;
-        }
-        .backup-table tr:hover { background: #f8f9fa; }
-        
-        .file-actions { display: flex; gap: 8px; }
-        
-        .restore-note {
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            color: #856404;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-size: 0.9em;
+            text-align: center;
+            letter-spacing: 2px;
         }
         
-        .restore-btn {
-            position: relative;
+        /* ===== UPLOAD AREA ===== */
+        .upload-area {
+            border: 2px dashed #26d0ce;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            background: rgba(38, 208, 206, 0.05);
+            transition: all 0.3s ease;
+            cursor: pointer;
         }
-        .restore-btn:after {
-            content: "🔁";
-            font-size: 0.8em;
-            margin-left: 5px;
+        
+        .upload-area:hover {
+            background: rgba(38, 208, 206, 0.1);
+            border-color: #1a2980;
+        }
+        
+        /* ===== RESPONSIVE DESIGN ===== */
+        @media (max-width: 1200px) {
+            .status-grid,
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                max-width: 850px;
+                gap: 20px;
+            }
+            
+            .format-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .page-title {
+                font-size: 2.2rem;
+            }
+        }
+        
+        @media (max-width: 992px) {
+            body {
+                padding-top: 140px;
+            }
+            
+            .oval-nav-container {
+                width: calc(100% - 40px);
+                max-width: 600px;
+            }
+            
+            .oval-nav {
+                padding: 15px;
+                flex-direction: column;
+                border-radius: 25px;
+            }
+            
+            .nav-menu {
+                flex-direction: column;
+                width: 100%;
+                gap: 5px;
+                margin-bottom: 15px;
+            }
+            
+            .dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: visible;
+                transform: none;
+                box-shadow: none;
+                border-radius: 10px;
+                background: #f9f9f9;
+                border: none;
+                display: none;
+                margin: 10px 0;
+            }
+            
+            .nav-item.active .dropdown-menu {
+                display: block;
+            }
+            
+            .user-section {
+                margin-left: 0;
+                padding-left: 0;
+                border-left: none;
+                border-top: 1px solid rgba(26, 41, 128, 0.2);
+                padding-top: 15px;
+                margin-top: 15px;
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .main-content {
+                padding: 0 20px 30px;
+            }
+            
+            .tab-navigation {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .status-grid,
+            .stats-grid {
+                grid-template-columns: 1fr;
+                max-width: 400px;
+                gap: 15px;
+            }
+            
+            .files-table {
+                display: block;
+                overflow-x: auto;
+            }
+            
+            .page-title {
+                font-size: 1.8rem;
+            }
+            
+            .page-subtitle {
+                font-size: 0.9rem;
+            }
         }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <div class="controls-top">
-            <div>
-                <a href="dashboard.php" class="btn btn-secondary">← Back to Dashboard</a>
-                <span style="margin-left: 20px; font-weight: 600;">
-                    Logged in as: <strong><?php echo htmlspecialchars($username); ?></strong> (Role: <strong><?php echo htmlspecialchars($userRole); ?></strong>)
-                </span>
-            </div>
-            <a href="logout.php" class="btn btn-secondary">Log Out</a>
-        </div>
-        
-        <header class="header">
-            <h1>💾 Multi-Database Backup & Restore System</h1>
-            <p style="opacity: 0.9; margin-top: 10px;">Backup from all 3 databases + Restore for MySQL</p>
-        </header>
-        
-        <div class="content">
-            <?php if ($message): ?>
-                <div class="message <?php echo $message_type; ?>">
-                    <?php echo $message; ?>
-                </div>
-            <?php endif; ?>
-            
-            <!-- Database Status -->
-            <div class="db-status">
-                <div class="db-card mysql">
-                    <h3>MySQL <span class="status-indicator <?php echo $mysql_available ? 'status-online' : 'status-offline'; ?>"></span></h3>
-                    <p><?php echo $mysql_available ? '✅ Connected' : '❌ Not connected'; ?></p>
-                    <small>Your Local Database (Backup + Restore)</small>
-                </div>
-                <div class="db-card sqlserver">
-                    <h3>SQL Server <span class="status-indicator <?php echo $sqlserver_available ? 'status-online' : 'status-offline'; ?>"></span></h3>
-                    <p><?php echo $sqlserver_available ? '✅ Connected' : '❌ Not connected'; ?></p>
-                    <small>Team Member (Backup Only)</small>
-                </div>
-                <div class="db-card postgresql">
-                    <h3>PostgreSQL <span class="status-indicator <?php echo $postgresql_available ? 'status-online' : 'status-offline'; ?>"></span></h3>
-                    <p><?php echo $postgresql_available ? '✅ Connected' : '❌ Not connected'; ?></p>
-                    <small>Team Member (Backup Only)</small>
-                </div>
-            </div>
-            
-            <!-- Tabs for different sections -->
-            <div class="tabs" id="tabs">
-                <div class="tab active" onclick="showTab('backup')">📥 Create Backup</div>
-                <div class="tab" onclick="showTab('restore')">📤 Restore Backup</div>
-                <div class="tab" onclick="showTab('files')">📁 Backup Files</div>
-                <div class="tab" onclick="showTab('logs')">📋 Logs</div>
-            </div>
-            
-            <!-- Tab 1: Create Backup -->
-            <div id="tab-backup" class="tab-content active">
-                <div class="card">
-                    <h2>📥 Create New Backup</h2>
-                    
-                    <div class="format-info">
-                        <div class="format-card sql">
-                            <strong>📊 SQL Format</strong>
-                            <p>• Creates .sql file</p>
-                            <p>• Contains INSERT statements</p>
-                            <p>• Best for database restoration</p>
-                        </div>
-                        <div class="format-card excel">
-                            <strong>📈 Excel/CSV Format</strong>
-                            <p>• Creates .zip with CSV files</p>
-                            <p>• Open in Excel/Google Sheets</p>
-                            <p>• Best for reporting/analysis</p>
+    <!-- OVAL NAVIGATION MENU -->
+    <div class="oval-nav-container" id="ovalNav">
+        <nav class="oval-nav" id="ovalNavInner">
+            <!-- NAVIGATION MENU -->
+            <ul class="nav-menu" id="navMenu">
+                <!-- DASHBOARD -->
+                <li class="nav-item">
+                    <a href="dashboard.php" class="nav-link">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                </li>
+                
+                <!-- INVENTORY MANAGEMENT -->
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-warehouse"></i> Inventory
+                    </a>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-header">Inventory Management</div>
+                        <a href="medDirectory.php" class="dropdown-item">
+                            <i class="fas fa-list-alt"></i> Medicine List
+                        </a>
+                        <a href="inventory.php" class="dropdown-item">
+                            <i class="fas fa-boxes"></i> Stock Management
+                        </a>
+                        <a href="low_stock.php" class="dropdown-item">
+                            <i class="fas fa-exclamation-triangle"></i> Low Stock Alert
+                        </a>
+                    </div>
+                </li>
+                
+                <!-- PRESCRIPTION MANAGEMENT -->
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-file-medical"></i> Prescriptions
+                    </a>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-header">Prescription Management</div>
+                        <a href="prescriptionDashboard.php" class="dropdown-item">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                        <a href="add_prescription.php" class="dropdown-item">
+                            <i class="fas fa-plus-circle"></i> New Prescription
+                        </a>
+                        <a href="prescription_history.php" class="dropdown-item">
+                            <i class="fas fa-history"></i> History
+                        </a>
+                    </div>
+                </li>
+                
+                <!-- SALES & BILLING -->
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-cash-register"></i> Sales
+                    </a>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-header">Sales & Billing</div>
+                        <a href="Sales_Billing.php" class="dropdown-item">
+                            <i class="fas fa-chart-line"></i> Dashboard
+                        </a>
+                        <a href="new_sale.php" class="dropdown-item">
+                            <i class="fas fa-shopping-cart"></i> New Sale
+                        </a>
+                        <a href="invoice_history.php" class="dropdown-item">
+                            <i class="fas fa-file-invoice-dollar"></i> Invoice History
+                        </a>
+                    </div>
+                </li>
+                
+                <!-- REPORTS & ANALYTICS -->
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-chart-line"></i> Reports
+                    </a>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-header">Reports & Analytics</div>
+                        <a href="reports.php" class="dropdown-item">
+                            <i class="fas fa-chart-bar"></i> Analytics Dashboard
+                        </a>
+                        <a href="sales_report.php" class="dropdown-item">
+                            <i class="fas fa-chart-pie"></i> Sales Reports
+                        </a>
+                        <a href="inventory_report.php" class="dropdown-item">
+                            <i class="fas fa-chart-area"></i> Inventory Reports
+                        </a>
+                    </div>
+                </li>
+                
+                <!-- BACKUP & RESTORE (Active) -->
+                <li class="nav-item">
+                    <a href="backup.php" class="nav-link" style="background: linear-gradient(135deg, rgba(26, 41, 128, 0.1) 0%, rgba(38, 208, 206, 0.1) 100%);">
+                        <i class="fas fa-database"></i> Backup
+                    </a>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-header">Backup & Restore</div>
+                        <a href="backup.php" class="dropdown-item" style="background: #f9fbff; border-left: 3px solid #26d0ce;">
+                            <i class="fas fa-database"></i> Backup & Restore System
+                        </a>
+                        <div class="dropdown-item" style="background: #f9fbff; border-left: 3px solid #26d0ce; margin: 6px; border-radius: 10px; padding: 12px;">
+                            <div style="font-size: 12px; color: #666;">
+                                <p style="margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-check-circle" style="color: #26d0ce;"></i> SQL + Excel formats
+                                </p>
+                                <p style="margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-check-circle" style="color: #26d0ce;"></i> Multi-database support
+                                </p>
+                                <p style="display: flex; align-items: center; gap: 6px;">
+                                    <i class="fas fa-check-circle" style="color: #26d0ce;"></i> Full restore functionality
+                                </p>
+                            </div>
                         </div>
                     </div>
+                </li>
+            </ul>
+            
+            <!-- USER SECTION -->
+            <div class="user-section">
+                <div class="user-badge">
+                    <i class="fas fa-user-circle"></i> <?php echo htmlspecialchars($username); ?> (<?php echo htmlspecialchars($userRole); ?>)
+                </div>
+                <button class="logout-btn" onclick="window.location.href='logout.php'">
+                    <i class="fas fa-sign-out-alt"></i> Log Out
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+        <h1 class="page-title">Backup & Restore System</h1>
+        <p class="page-subtitle">Backup, restore, and manage data from all connected databases</p>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+        <?php if ($message): ?>
+            <div class="alert-message <?php echo $message_type === 'success' ? 'alert-success' : 'alert-error'; ?>">
+                <?php echo $message; ?>
+            </div>
+        <?php endif; ?>
+        
+        <!-- DATABASE STATUS -->
+        <div class="status-container">
+            <div class="status-grid">
+                <div class="status-card">
+                    <div class="status-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div class="status-name">MySQL</div>
+                    <div class="status-indicator <?php echo $mysql_available ? 'status-online' : 'status-offline'; ?>">
+                        <span class="status-dot <?php echo $mysql_available ? 'dot-online' : 'dot-offline'; ?>"></span>
+                        <?php echo $mysql_available ? 'Connected' : 'Not Connected'; ?>
+                    </div>
+                    <div class="status-description">Your Local Database (Full Backup & Restore)</div>
+                </div>
+                
+                <div class="status-card">
+                    <div class="status-icon">
+                        <i class="fas fa-server"></i>
+                    </div>
+                    <div class="status-name">SQL Server</div>
+                    <div class="status-indicator <?php echo $sqlserver_available ? 'status-online' : 'status-offline'; ?>">
+                        <span class="status-dot <?php echo $sqlserver_available ? 'dot-online' : 'dot-offline'; ?>"></span>
+                        <?php echo $sqlserver_available ? 'Connected' : 'Not Connected'; ?>
+                    </div>
+                    <div class="status-description">Team Member Database (Backup Only)</div>
+                </div>
+                
+                <div class="status-card">
+                    <div class="status-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div class="status-name">PostgreSQL</div>
+                    <div class="status-indicator <?php echo $postgresql_available ? 'status-online' : 'status-offline'; ?>">
+                        <span class="status-dot <?php echo $postgresql_available ? 'dot-online' : 'dot-offline'; ?>"></span>
+                        <?php echo $postgresql_available ? 'Connected' : 'Not Connected'; ?>
+                    </div>
+                    <div class="status-description">Team Member Database (Backup Only)</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- BACKUP STATISTICS -->
+        <div class="status-container">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value"><?php echo count($backup_files); ?></div>
+                    <div class="stat-label">Total Backups</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-value">
+                        <?php
+                        echo formatBytes($total_size);
+                        ?>
+                    </div>
+                    <div class="stat-label">Storage Used</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-value">
+                        <?php echo count(array_filter($backup_files, function($f) { return strpos($f, '_mysql_') !== false; })); ?>
+                    </div>
+                    <div class="stat-label">MySQL Backups</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-value">
+                        <?php echo count(array_filter($backup_files, function($f) { 
+                            return strpos($f, '_sqlserver_') !== false || strpos($f, '_postgresql_') !== false; 
+                        })); ?>
+                    </div>
+                    <div class="stat-label">Team Backups</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- BACKUP CONTROL PANEL -->
+        <div class="backup-container">
+            <!-- TAB NAVIGATION -->
+            <div class="tab-navigation">
+                <button class="tab-button active" onclick="showTab('create')">
+                    <i class="fas fa-plus-circle"></i> Create Backup
+                </button>
+                <button class="tab-button" onclick="showTab('restore')">
+                    <i class="fas fa-history"></i> Restore
+                </button>
+                <button class="tab-button" onclick="showTab('upload')">
+                    <i class="fas fa-upload"></i> Upload
+                </button>
+                <button class="tab-button" onclick="showTab('files')">
+                    <i class="fas fa-folder-open"></i> Backup Files
+                </button>
+            </div>
+            
+            <!-- CREATE BACKUP TAB -->
+            <div id="tab-create" class="tab-content active">
+                <div class="backup-form">
+                    <h3 style="color: #1a2980; margin-bottom: 25px; text-align: center;">
+                        <i class="fas fa-cloud-upload-alt"></i> Create New Database Backup
+                    </h3>
                     
                     <form method="POST" action="">
                         <div class="form-group">
-                            <label>Select Database</label>
+                            <label class="form-label">Select Database</label>
                             <select name="database_type" class="form-control" onchange="updateDbStatus(this.value)">
-                                <option value="mysql" <?php echo $mysql_available ? '' : 'disabled'; ?>>MySQL <?php echo $mysql_available ? '✅' : '❌'; ?></option>
-                                <option value="sqlserver" <?php echo $sqlserver_available ? '' : 'disabled'; ?>>SQL Server <?php echo $sqlserver_available ? '✅' : '❌'; ?></option>
-                                <option value="postgresql" <?php echo $postgresql_available ? '' : 'disabled'; ?>>PostgreSQL <?php echo $postgresql_available ? '✅' : '❌'; ?></option>
+                                <option value="mysql" <?php echo $mysql_available ? '' : 'disabled'; ?>>
+                                    MySQL <?php echo $mysql_available ? '✅ Connected' : '❌ Not Connected'; ?>
+                                </option>
+                                <option value="sqlserver" <?php echo $sqlserver_available ? '' : 'disabled'; ?>>
+                                    SQL Server <?php echo $sqlserver_available ? '✅ Connected' : '❌ Not Connected'; ?>
+                                </option>
+                                <option value="postgresql" <?php echo $postgresql_available ? '' : 'disabled'; ?>>
+                                    PostgreSQL <?php echo $postgresql_available ? '✅ Connected' : '❌ Not Connected'; ?>
+                                </option>
                             </select>
-                            <small id="db-status-text" style="color: #666;">
-                                <?php echo $mysql_available ? 'MySQL is available for backup' : 'No databases available'; ?>
+                            <small id="db-status-text" style="color: #666; margin-top: 5px; display: block;">
+                                <?php echo $mysql_available ? 'MySQL is available for backup' : 'Select an available database'; ?>
                             </small>
                         </div>
                         
                         <div class="form-group">
-                            <label>Backup Format</label>
-                            <select name="backup_format" class="form-control">
-                                <option value="sql">SQL Format (.sql) - For database restoration</option>
-                                <option value="excel">Excel/CSV Format (.zip) - For reports in Excel</option>
-                            </select>
+                            <label class="form-label">Backup Format</label>
+                            <div class="format-grid">
+                                <div class="format-card sql" onclick="selectFormat('sql')" id="format-sql">
+                                    <div class="format-icon">
+                                        <i class="fas fa-database"></i>
+                                    </div>
+                                    <div class="format-title">SQL Format</div>
+                                    <ul class="format-features">
+                                        <li>Creates .sql file</li>
+                                        <li>Contains INSERT statements</li>
+                                        <li>Best for database restoration</li>
+                                        <li>Compatible with all databases</li>
+                                    </ul>
+                                </div>
+                                
+                                <div class="format-card excel" onclick="selectFormat('excel')" id="format-excel">
+                                    <div class="format-icon">
+                                        <i class="fas fa-file-excel"></i>
+                                    </div>
+                                    <div class="format-title">Excel/CSV Format</div>
+                                    <ul class="format-features">
+                                        <li>Creates .zip with CSV files</li>
+                                        <li>Open in Excel/Google Sheets</li>
+                                        <li>Best for reporting/analysis</li>
+                                        <li>Easy data sharing</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <input type="hidden" name="backup_format" id="backup_format" value="sql">
                         </div>
                         
                         <div class="form-group">
-                            <label>Backup Name (Optional)</label>
+                            <label class="form-label">Backup Name (Optional)</label>
                             <input type="text" name="backup_name" class="form-control" 
                                    value="Pharmacy_Backup_<?php echo date('Y-m-d'); ?>" 
-                                   placeholder="Enter backup name">
+                                   placeholder="Enter a descriptive name for your backup">
                         </div>
                         
-                        <button type="submit" name="create_backup" class="btn btn-primary" style="width: 100%; padding: 12px;">
-                            🚀 Create Backup
+                        <button type="submit" name="create_backup" class="btn-backup">
+                            <i class="fas fa-rocket"></i> Create Backup Now
                         </button>
                         
-                        <p style="margin-top: 15px; font-size: 0.9em; color: #666; text-align: center;">
-                            Creates a backup of the selected database. Only available databases can be backed up.
+                        <p style="margin-top: 15px; text-align: center; color: #666; font-size: 13px;">
+                            <i class="fas fa-info-circle"></i> This will backup all tables: USER, PATIENT, MEDICINE, PRESCRIPTION, PRESCRIPTION_DETAIL
                         </p>
                     </form>
                 </div>
             </div>
             
-            <!-- Tab 2: Restore Backup -->
+            <!-- RESTORE TAB -->
             <div id="tab-restore" class="tab-content">
-                <div class="card">
-                    <h2>📤 Restore Database (MySQL Only)</h2>
+                <div class="backup-form">
+                    <h3 style="color: #1a2980; margin-bottom: 25px; text-align: center;">
+                        <i class="fas fa-history"></i> Restore Database from Backup
+                    </h3>
                     
-                    <div class="restore-note">
-                        <strong>⚠️ IMPORTANT:</strong> 
-                        <p>• Only <strong>MySQL backups</strong> can be restored on this system</p>
-                        <p>• SQL Server and PostgreSQL backups are for team members</p>
-                        <p>• This will DELETE all current MySQL data before restoring</p>
+                    <div class="restore-warning">
+                        <h4><i class="fas fa-exclamation-triangle"></i> IMPORTANT WARNING</h4>
+                        <p>Restoring a backup will OVERWRITE all existing data in the selected database. This action cannot be undone.</p>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li>Make sure you have a current backup before proceeding</li>
+                            <li>Only restore to the same database type (MySQL to MySQL, etc.)</li>
+                            <li>Large restores may take several minutes</li>
+                            <li>All users will be logged out during restoration</li>
+                        </ul>
                     </div>
                     
-                    <!-- Option 1: Upload backup file -->
-                    <h3>Option 1: Upload Backup File</h3>
-                    <form method="POST" action="" enctype="multipart/form-data" onsubmit="return confirmRestore()">
+                    <form method="POST" action="" onsubmit="return confirmRestore()">
                         <div class="form-group">
-                            <label>Select Backup File (MySQL backups only)</label>
-                            <input type="file" name="backup_file" class="form-control" accept=".sql,.zip,.txt" required>
-                            <p style="font-size: 0.85em; color: #666; margin-top: 5px;">
-                                Supported formats: .sql, .zip (with CSV files)
-                            </p>
+                            <label class="form-label">Select Backup File</label>
+                            <select name="backup_file" class="form-control" required>
+                                <option value="">-- Select a backup file --</option>
+                                <?php foreach ($backup_files as $file): 
+                                    $filepath = $db_backup_dir . $file;
+                                    if (file_exists($filepath)):
+                                ?>
+                                    <option value="<?php echo htmlspecialchars($file); ?>">
+                                        <?php echo htmlspecialchars($file); ?> 
+                                        (<?php echo date('M d, Y H:i', filemtime($filepath)); ?>)
+                                    </option>
+                                <?php endif; endforeach; ?>
+                            </select>
                         </div>
                         
-                        <button type="submit" name="restore_backup" class="btn btn-warning restore-btn" style="width: 100%; padding: 12px;">
-                            🔄 Upload & Restore MySQL Database
+                        <div class="form-group">
+                            <label class="form-label">Target Database</label>
+                            <select name="database_type" class="form-control" required>
+                                <option value="mysql" <?php echo $mysql_available ? '' : 'disabled'; ?>>
+                                    MySQL <?php echo $mysql_available ? '✅ Connected' : '❌ Not Connected'; ?>
+                                </option>
+                                <option value="sqlserver" disabled>SQL Server (Restore not available)</option>
+                                <option value="postgresql" disabled>PostgreSQL (Restore not available)</option>
+                            </select>
+                            <small style="color: #666; margin-top: 5px; display: block;">
+                                Note: Restoration is only available for MySQL. Team databases are read-only.
+                            </small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-exclamation-circle"></i> Type "YES" to confirm
+                            </label>
+                            <input type="text" name="confirmation" class="form-control confirmation-input" 
+                                   placeholder="TYPE: YES" required pattern="YES">
+                            <small style="color: #666; margin-top: 5px; display: block;">
+                                This is required to prevent accidental data loss
+                            </small>
+                        </div>
+                        
+                        <button type="submit" name="restore_backup" class="btn-danger">
+                            <i class="fas fa-bomb"></i> RESTORE DATABASE NOW
                         </button>
                     </form>
-                    
-                    <!-- Option 2: Select from existing MySQL backups -->
-                    <div style="margin-top: 30px;">
-                        <h3>Option 2: Restore from Existing MySQL Backup</h3>
-                        <?php 
-                        // Filter only MySQL backup files
-                        $mysql_backup_files = array_filter($backup_files, function($file) {
-                            return strpos($file, '_mysql_') !== false;
-                        });
-                        ?>
-                        
-                        <?php if (count($mysql_backup_files) > 0): ?>
-                            <table class="backup-table" style="margin-top: 15px;">
-                                <thead>
-                                    <tr>
-                                        <th>Filename</th>
-                                        <th>Size</th>
-                                        <th>Date</th>
-                                        <th>Format</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($mysql_backup_files as $file): 
-                                        $filepath = $db_backup_dir . $file;
-                                        $filesize = file_exists($filepath) ? formatBytes(filesize($filepath)) : 'N/A';
-                                        $filedate = file_exists($filepath) ? date('Y-m-d H:i', filemtime($filepath)) : 'N/A';
-                                        $fileext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-                                        $format_badge = $fileext === 'zip' ? 
-                                            '<span class="file-type-badge badge-excel">Excel</span>' : 
-                                            '<span class="file-type-badge badge-sql">SQL</span>';
-                                    ?>
-                                        <tr>
-                                            <td><strong><?php echo htmlspecialchars($file); ?></strong></td>
-                                            <td><?php echo $filesize; ?></td>
-                                            <td><?php echo $filedate; ?></td>
-                                            <td><?php echo $format_badge; ?></td>
-                                            <td>
-                                                <a href="?restore=<?php echo urlencode($file); ?>" 
-                                                   class="btn btn-warning restore-btn" style="padding: 8px 15px;"
-                                                   onclick="return confirm('⚠️ CRITICAL: This will DELETE all current MySQL data and restore from <?php echo htmlspecialchars($file); ?>!\n\nAre you ABSOLUTELY sure?')">
-                                                    🔄 Restore
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        <?php else: ?>
-                            <p style="color: #666; text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px;">
-                                No MySQL backup files found. Create a MySQL backup first.
-                            </p>
-                        <?php endif; ?>
-                    </div>
                 </div>
             </div>
             
-            <!-- Tab 3: Backup Files -->
+            <!-- UPLOAD TAB -->
+            <div id="tab-upload" class="tab-content">
+                <div class="backup-form">
+                    <h3 style="color: #1a2980; margin-bottom: 25px; text-align: center;">
+                        <i class="fas fa-cloud-upload-alt"></i> Upload Backup File
+                    </h3>
+                    
+                    <form method="POST" action="" enctype="multipart/form-data">
+                        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-file-upload" style="font-size: 48px; color: #26d0ce; margin-bottom: 15px;"></i>
+                            <h4>Click to select backup file</h4>
+                            <p style="color: #666;">Supported formats: .sql, .zip</p>
+                            <p style="color: #999; font-size: 12px;">Max file size: 50MB</p>
+                            <input type="file" id="fileInput" name="backup_file" 
+                                   accept=".sql,.zip" style="display: none;" 
+                                   onchange="document.getElementById('fileName').textContent = this.files[0].name">
+                            <div id="fileName" style="margin-top: 15px; font-weight: 600; color: #1a2980;"></div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">File Description (Optional)</label>
+                            <input type="text" name="description" class="form-control" 
+                                   placeholder="e.g., Emergency backup from Dec 2024">
+                        </div>
+                        
+                        <button type="submit" name="upload_restore" class="btn-backup">
+                            <i class="fas fa-upload"></i> Upload Backup File
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- BACKUP FILES TAB -->
             <div id="tab-files" class="tab-content">
-                <div class="card">
-                    <h2>📁 Existing Backup Files</h2>
+                <div style="background: white; border-radius: 10px; padding: 20px;">
+                    <h3 style="color: #1a2980; margin-bottom: 20px; text-align: center;">
+                        <i class="fas fa-archive"></i> Backup Files Archive
+                    </h3>
                     
                     <?php if (count($backup_files) > 0): ?>
-                        <table class="backup-table">
+                        <table class="files-table">
                             <thead>
                                 <tr>
                                     <th>Filename</th>
-                                    <th>Size</th>
-                                    <th>Date</th>
                                     <th>Database</th>
                                     <th>Format</th>
+                                    <th>Size</th>
+                                    <th>Date</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -1045,54 +1865,42 @@ $postgresql_available = (isset($pg_conn) && $pg_conn instanceof PDO);
                                 <?php foreach ($backup_files as $file): 
                                     $filepath = $db_backup_dir . $file;
                                     $filesize = file_exists($filepath) ? formatBytes(filesize($filepath)) : 'N/A';
-                                    $filedate = file_exists($filepath) ? date('Y-m-d H:i', filemtime($filepath)) : 'N/A';
+                                    $filedate = file_exists($filepath) ? date('M d, Y H:i', filemtime($filepath)) : 'N/A';
                                     $fileext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
                                     
                                     // Determine database type from filename
-                                    $db_badge = '';
                                     if (strpos($file, '_mysql_') !== false) {
-                                        $db_badge = '<span class="file-type-badge badge-mysql">MySQL</span>';
+                                        $db_type = 'MySQL';
+                                        $db_class = 'badge-mysql';
                                     } elseif (strpos($file, '_sqlserver_') !== false) {
-                                        $db_badge = '<span class="file-type-badge badge-sqlserver">SQL Server</span>';
+                                        $db_type = 'SQL Server';
+                                        $db_class = 'badge-sqlserver';
                                     } elseif (strpos($file, '_postgresql_') !== false) {
-                                        $db_badge = '<span class="file-type-badge badge-postgresql">PostgreSQL</span>';
+                                        $db_type = 'PostgreSQL';
+                                        $db_class = 'badge-postgresql';
+                                    } else {
+                                        $db_type = 'Unknown';
+                                        $db_class = 'badge-format';
                                     }
                                     
-                                    $format_badge = $fileext === 'zip' ? 
-                                        '<span class="file-type-badge badge-excel">Excel</span>' : 
-                                        '<span class="file-type-badge badge-sql">SQL</span>';
-                                    
-                                    // Check if restore is available (only for MySQL)
-                                    $can_restore = (strpos($file, '_mysql_') !== false);
+                                    $format = ($fileext === 'zip') ? 'Excel/CSV' : 'SQL';
                                 ?>
                                     <tr>
-                                        <td><strong><?php echo htmlspecialchars($file); ?></strong></td>
+                                        <td style="font-weight: 600;"><?php echo htmlspecialchars($file); ?></td>
+                                        <td><span class="file-badge <?php echo $db_class; ?>"><?php echo $db_type; ?></span></td>
+                                        <td><span class="file-badge badge-format"><?php echo $format; ?></span></td>
                                         <td><?php echo $filesize; ?></td>
                                         <td><?php echo $filedate; ?></td>
-                                        <td><?php echo $db_badge; ?></td>
-                                        <td><?php echo $format_badge; ?></td>
                                         <td>
-                                            <div class="file-actions">
+                                            <div class="action-buttons">
                                                 <a href="backups/database/<?php echo urlencode($file); ?>" 
-                                                   download class="btn btn-primary" style="padding: 6px 12px;">
-                                                    📥 Download
+                                                   download class="btn-action btn-download">
+                                                    <i class="fas fa-download"></i> Download
                                                 </a>
-                                                <?php if ($can_restore): ?>
-                                                <a href="?restore=<?php echo urlencode($file); ?>" 
-                                                   class="btn btn-warning restore-btn" style="padding: 6px 12px;"
-                                                   onclick="return confirm('⚠️ Restore from <?php echo htmlspecialchars($file); ?>?\n\nThis will overwrite current MySQL data!')">
-                                                    🔄 Restore
-                                                </a>
-                                                <?php else: ?>
-                                                <span class="btn btn-secondary" style="padding: 6px 12px; opacity: 0.7;" 
-                                                      title="Only MySQL backups can be restored on this system">
-                                                    🔄 Restore
-                                                </span>
-                                                <?php endif; ?>
                                                 <a href="?delete=<?php echo urlencode($file); ?>" 
-                                                   class="btn btn-danger" style="padding: 6px 12px;"
-                                                   onclick="return confirm('Delete backup file: <?php echo htmlspecialchars($file); ?>?')">
-                                                    🗑️ Delete
+                                                   class="btn-action btn-delete"
+                                                   onclick="return confirm('Are you sure you want to delete <?php echo htmlspecialchars($file); ?>?')">
+                                                    <i class="fas fa-trash"></i> Delete
                                                 </a>
                                             </div>
                                         </td>
@@ -1102,85 +1910,34 @@ $postgresql_available = (isset($pg_conn) && $pg_conn instanceof PDO);
                         </table>
                     <?php else: ?>
                         <div style="text-align: center; padding: 40px; background: #f8f9fa; border-radius: 8px;">
-                            <p style="color: #666; font-size: 1.1em;">No backup files found.</p>
-                            <p style="color: #999; margin-top: 10px;">Create your first backup using the "Create Backup" tab.</p>
+                            <i class="fas fa-folder-open" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
+                            <p style="color: #666; font-size: 1.1em;">No backup files found</p>
+                            <p style="color: #999; margin-top: 10px;">Create your first backup using the "Create Backup" tab</p>
                         </div>
                     <?php endif; ?>
-                </div>
-            </div>
-            
-            <!-- Tab 4: Logs -->
-            <div id="tab-logs" class="tab-content">
-                <div class="card">
-                    <h2>📋 Backup Logs</h2>
-                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; max-height: 400px; overflow-y: auto;">
-                        <?php
-                        $log_files = [];
-                        if (file_exists($logs_dir)) {
-                            $logs = scandir($logs_dir);
-                            foreach ($logs as $log) {
-                                if ($log !== '.' && $log !== '..') {
-                                    $log_files[] = $log;
-                                }
-                            }
-                        }
-                        
-                        if (count($log_files) > 0): 
-                            rsort($log_files); // Newest first
-                        ?>
-                            <?php foreach ($log_files as $log_file): 
-                                $log_path = $logs_dir . $log_file;
-                                $log_content = file_exists($log_path) ? file_get_contents($log_path) : '';
-                            ?>
-                                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd;">
-                                    <strong><?php echo htmlspecialchars($log_file); ?></strong><br>
-                                    <pre style="background: white; padding: 10px; border-radius: 5px; margin-top: 5px; font-size: 0.9em;"><?php echo htmlspecialchars($log_content); ?></pre>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <p style="color: #666; text-align: center;">No log files found.</p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Backup Statistics -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 40px;">
-                <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); text-align: center; border-top: 4px solid #0066ff;">
-                    <p>📊 Total Backups</p>
-                    <h3 style="font-size: 2.5em; margin: 10px 0; color: #0066ff;"><?php echo count($backup_files); ?></h3>
-                </div>
-                <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); text-align: center; border-top: 4px solid #0066ff;">
-                    <p>💾 Storage Used</p>
-                    <h3 style="font-size: 2.5em; margin: 10px 0; color: #0066ff;">
-                        <?php
-                        $total_size = 0;
-                        foreach ($backup_files as $file) {
-                            $filepath = $db_backup_dir . $file;
-                            if (file_exists($filepath)) {
-                                $total_size += filesize($filepath);
-                            }
-                        }
-                        echo formatBytes($total_size);
-                        ?>
-                    </h3>
-                </div>
-                <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); text-align: center; border-top: 4px solid #4caf50;">
-                    <p>✅ MySQL Backups</p>
-                    <h3 style="font-size: 2.5em; margin: 10px 0; color: #4caf50;">
-                        <?php echo count(array_filter($backup_files, function($f) { return strpos($f, '_mysql_') !== false; })); ?>
-                    </h3>
-                </div>
-                <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); text-align: center; border-top: 4px solid #0066ff;">
-                    <p>🔁 Can Restore</p>
-                    <h3 style="font-size: 2.5em; margin: 10px 0; color: #0066ff;">MySQL Only</h3>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Tab switching
+        // Scroll effect for oval navigation
+        const ovalNav = document.getElementById('ovalNav');
+        const ovalNavInner = document.getElementById('ovalNavInner');
+        
+        window.addEventListener('scroll', () => {
+            if (window.innerWidth > 992) {
+                if (window.scrollY > 50) {
+                    ovalNav.classList.add('scrolled');
+                    ovalNavInner.classList.add('scrolled');
+                } else {
+                    ovalNav.classList.remove('scrolled');
+                    ovalNavInner.classList.remove('scrolled');
+                }
+            }
+        });
+        
+        // Tab functionality
         function showTab(tabName) {
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
@@ -1188,8 +1945,8 @@ $postgresql_available = (isset($pg_conn) && $pg_conn instanceof PDO);
             });
             
             // Remove active class from all tab buttons
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
             });
             
             // Show selected tab
@@ -1199,22 +1956,46 @@ $postgresql_available = (isset($pg_conn) && $pg_conn instanceof PDO);
             event.target.classList.add('active');
         }
         
+        // Format selection
+        function selectFormat(format) {
+            // Remove selected class from all format cards
+            document.querySelectorAll('.format-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            // Add selected class to clicked card
+            document.getElementById('format-' + format).classList.add('selected');
+            
+            // Set hidden input value
+            document.getElementById('backup_format').value = format;
+        }
+        
+        // Database status update
         function updateDbStatus(selectedDb) {
             const statusText = document.getElementById('db-status-text');
             const dbStatus = {
-                'mysql': '<?php echo $mysql_available ? "MySQL is available for backup & restore" : "MySQL is not connected"; ?>',
-                'sqlserver': '<?php echo $sqlserver_available ? "SQL Server is available for backup only" : "SQL Server is not connected"; ?>',
-                'postgresql': '<?php echo $postgresql_available ? "PostgreSQL is available for backup only" : "PostgreSQL is not connected"; ?>'
+                'mysql': '<?php echo $mysql_available ? "✅ MySQL is available for backup" : "❌ MySQL is not connected"; ?>',
+                'sqlserver': '<?php echo $sqlserver_available ? "✅ SQL Server is available for backup" : "❌ SQL Server is not connected"; ?>',
+                'postgresql': '<?php echo $postgresql_available ? "✅ PostgreSQL is available for backup" : "❌ PostgreSQL is not connected"; ?>'
             };
             statusText.textContent = dbStatus[selectedDb] || 'Select a database';
         }
         
+        // Restore confirmation
         function confirmRestore() {
-            return confirm("⚠️ CRITICAL WARNING:\n\nThis will DELETE ALL current MySQL data and restore from backup!\n\nAre you ABSOLUTELY sure you want to continue?");
+            const confirmation = document.querySelector('input[name="confirmation"]').value;
+            if (confirmation !== 'YES') {
+                alert('You must type YES to confirm restoration');
+                return false;
+            }
+            
+            return confirm('⚠️ FINAL WARNING: This will OVERWRITE all data in your database.\n\nThis action cannot be undone!\n\nAre you absolutely sure?');
         }
         
-        // Initialize
+        // Initialize format selection
         document.addEventListener('DOMContentLoaded', function() {
+            selectFormat('sql');
+            
             const select = document.querySelector('select[name="database_type"]');
             if (select) {
                 updateDbStatus(select.value);
@@ -1234,4 +2015,3 @@ function formatBytes($bytes, $precision = 2) {
     
     return round($bytes, $precision) . ' ' . $units[$pow];
 }
-?>
