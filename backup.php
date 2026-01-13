@@ -564,309 +564,425 @@ foreach ($backup_files as $file) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PharmaCare - Backup & Restore System</title>
+    <title>Backup & Restore | Pharmacy</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
     <style>
-        /* ===== DASHBOARD THEME STYLES ===== */
+        /* Medical Professional Color Scheme with Dark Blue - SAME AS DASHBOARD */
+        :root {
+            --dark-blue: #1c4966;
+            --blue-medium: #2a5d7a;
+            --blue-light: #e3f2fd;
+            --blue-accent: #4a90e2;
+            --cream-white: #f8fafc;
+            --soft-grey: #8a8a8a;
+            --dark-grey: #2c3e50;
+            --alert-red: #d9534f;
+            --warning-orange: #f0ad4e;
+            --success-green: #5cb85c;
+            
+            --sidebar-bg: var(--dark-blue);
+            --sidebar-text: white;
+            --main-bg: var(--cream-white);
+            --card-bg: white;
+            --border-color: #e1e8ed;
+            --text-primary: var(--dark-grey);
+            --text-secondary: var(--soft-grey);
+        }
+
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
         }
-        
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0d1b4e 0%, #1a2980 30%, #26d0ce 100%);
-            background-attachment: fixed;
-            color: #333;
+            font-family: "Be Vietnam Pro", sans-serif;
+            background: var(--main-bg);
+            color: var(--text-primary);
             min-height: 100vh;
-            padding-top: 100px; /* Space for fixed menu */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+            font-weight: 400;
+            line-height: 1.5;
         }
-        
-        a {
-            text-decoration: none;
-            color: inherit;
+
+        /* DASHBOARD CONTAINER - EXACT SAME SIZE AND STYLE */
+        .dashboard-container {
+            width: 100%;
+            max-width: 1400px;
+            height: 92vh;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(28, 73, 102, 0.1);
+            overflow: hidden;
+            display: flex;
         }
-        
-        /* ===== OVAL NAVIGATION MENU ===== */
-        .oval-nav-container {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            width: auto;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+        /* SIDEBAR - EXACT SAME AS DASHBOARD */
+        .sidebar {
+            width: 260px;
+            background: linear-gradient(180deg, var(--dark-blue) 0%, #143852 100%);
+            color: var(--sidebar-text);
+            display: flex;
+            flex-direction: column;
+            padding: 25px 0;
         }
-        
-        .oval-nav-container.scrolled {
-            top: 10px;
-            transform: translateX(-50%) scale(0.95);
+
+        .pharmacy-logo {
+            text-align: center;
+            padding: 0 20px 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
         }
-        
-        .oval-nav {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(15px);
-            border-radius: 50px;
-            padding: 8px 25px;
-            box-shadow: 0 10px 30px rgba(0, 0, 100, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+
+        .pharmacy-logo h1 {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
-        }
-        
-        .oval-nav.scrolled {
-            padding: 6px 20px;
-            background: rgba(255, 255, 255, 0.98);
-            box-shadow: 0 8px 25px rgba(0, 0, 100, 0.15);
-        }
-        
-        /* ===== NAVIGATION MENU ===== */
-        .nav-menu {
-            display: flex;
-            list-style: none;
-            gap: 2px;
-            margin: 0;
-            padding: 0;
-        }
-        
-        .nav-item {
-            position: relative;
-        }
-        
-        .nav-link {
-            display: flex;
-            align-items: center;
             gap: 8px;
-            padding: 12px 16px;
-            color: #1a2980;
-            font-weight: 600;
-            font-size: 13px;
-            transition: all 0.3s ease;
-            border-radius: 30px;
-            white-space: nowrap;
         }
-        
-        .nav-link:hover {
-            background: linear-gradient(135deg, rgba(26, 41, 128, 0.1) 0%, rgba(38, 208, 206, 0.1) 100%);
-            color: #1a2980;
-            transform: translateY(-1px);
-        }
-        
-        .nav-link i {
-            color: #26d0ce;
-            font-size: 14px;
-            width: 18px;
-            text-align: center;
-        }
-        
-        /* ===== DROPDOWN MENUS ===== */
-        .dropdown-menu {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            background: white;
-            min-width: 230px;
-            box-shadow: 0 15px 35px rgba(0, 0, 100, 0.2);
-            border-radius: 15px;
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(-15px) scale(0.95);
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1000;
-            border: 1px solid rgba(26, 41, 128, 0.1);
-            overflow: hidden;
-            margin-top: 10px;
-        }
-        
-        .nav-item:hover .dropdown-menu {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0) scale(1);
-        }
-        
-        .dropdown-header {
-            padding: 12px 18px;
-            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
-            color: white;
-            font-weight: 600;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 18px;
-            color: #555;
-            border-bottom: 1px solid #f0f7ff;
-            transition: all 0.2s ease;
-            font-size: 13px;
-        }
-        
-        .dropdown-item:hover {
-            background: linear-gradient(135deg, #f9fbff 0%, #e6f0ff 100%);
-            color: #1a2980;
-            padding-left: 22px;
-            border-left: 3px solid #26d0ce;
-        }
-        
-        .dropdown-item i {
-            color: #26d0ce;
-            width: 16px;
-            font-size: 13px;
-        }
-        
-        /* ===== USER SECTION ===== */
-        .user-section {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-left: 20px;
-            padding-left: 20px;
-            border-left: 1px solid rgba(26, 41, 128, 0.2);
-        }
-        
-        .user-badge {
-            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 25px;
-            font-weight: 600;
-            font-size: 12px;
-            box-shadow: 0 4px 12px rgba(26, 41, 128, 0.2);
-            display: flex;
-            align-items: center;
-            gap: 7px;
-            white-space: nowrap;
-        }
-        
-        .logout-btn {
-            background: #ffeaea;
-            color: #d32f2f;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 25px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 12px;
-            white-space: nowrap;
-        }
-        
-        .logout-btn:hover {
-            background: #ffcccc;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(211, 47, 47, 0.3);
-        }
-        
-        /* ===== PAGE HEADER ===== */
-        .page-header {
-            text-align: center;
-            padding: 30px 20px 20px;
-            margin-bottom: 30px;
-        }
-        
-        .page-title {
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin-bottom: 10px;
-            color: white;
-            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-            line-height: 1.1;
-        }
-        
-        .page-subtitle {
-            font-size: 1.1rem;
+
+        .pharmacy-logo p {
+            font-size: 0.8em;
             color: rgba(255, 255, 255, 0.85);
             font-weight: 300;
-            letter-spacing: 0.5px;
-            max-width: 600px;
-            margin: 0 auto;
         }
-        
-        /* ===== MAIN CONTENT ===== */
-        .main-content {
-            padding: 0 30px 40px;
-        }
-        
-        /* ===== DATABASE STATUS CARDS ===== */
-        .status-container {
+
+        .user-profile {
+            padding: 20px;
             display: flex;
-            justify-content: center;
-            margin-bottom: 40px;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
         }
-        
+
+        .user-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, white, var(--blue-light));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--dark-blue);
+            font-weight: 600;
+            font-size: 1.2em;
+            border: 2px solid white;
+        }
+
+        .user-info {
+            margin-left: 12px;
+        }
+
+        .user-name {
+            font-weight: 500;
+            font-size: 0.95em;
+            margin-bottom: 3px;
+        }
+
+        .user-role {
+            font-size: 0.8em;
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.15);
+            padding: 3px 8px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+
+        /* Navigation Menu - SAME STYLE */
+        .nav-menu {
+            flex: 1;
+            padding: 25px 0;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            margin-bottom: 25px;
+            padding: 0 20px;
+        }
+
+        .nav-title {
+            font-size: 0.75em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 12px;
+            font-weight: 500;
+        }
+
+        .nav-links {
+            list-style: none;
+        }
+
+        .nav-links li {
+            margin-bottom: 6px;
+        }
+
+        .nav-links a {
+            display: flex;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            padding: 10px 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            border-left: 2px solid transparent;
+            font-size: 0.9em;
+        }
+
+        .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-left-color: var(--blue-accent);
+        }
+
+        .nav-links a.active {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border-left-color: white;
+            font-weight: 500;
+        }
+
+        .nav-icon {
+            width: 20px;
+            text-align: center;
+            margin-right: 10px;
+            font-size: 1em;
+        }
+
+        .logout-btn {
+            margin: 15px 20px 0;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .logout-btn:hover {
+            background: var(--alert-red);
+            border-color: var(--alert-red);
+            transform: translateY(-1px);
+        }
+
+        /* MAIN CONTENT AREA - EXACT SAME AS DASHBOARD */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header - EXACT SAME */
+        .main-header {
+            padding: 20px 35px;
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title h1 {
+            font-size: 1.4em;
+            color: var(--dark-blue);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .header-title p {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            font-weight: 300;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-box input {
+            padding: 10px 15px 10px 40px;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            width: 280px;
+            font-size: 0.9em;
+            background: var(--blue-light);
+            transition: all 0.3s ease;
+            font-weight: 300;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--dark-blue);
+            box-shadow: 0 0 0 2px rgba(28, 73, 102, 0.1);
+            background: white;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--dark-blue);
+            font-size: 0.9em;
+        }
+
+        /* Content Area - EXACT SAME */
+        .content-wrapper {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background: var(--main-bg);
+        }
+
+        /* Welcome Section */
+        .welcome-section {
+            background: linear-gradient(135deg, var(--dark-blue), var(--blue-medium));
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .welcome-text h2 {
+            font-size: 1.5em;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .welcome-text p {
+            font-size: 0.95em;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        /* System Navigation */
+        .system-nav {
+            display: flex;
+            gap: 10px;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
+            flex-wrap: wrap;
+        }
+
+        .system-nav a {
+            background: var(--blue-light);
+            color: var(--dark-blue);
+            font-weight: 500;
+            border-radius: 8px;
+            padding: 10px 18px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+            font-size: 0.9em;
+        }
+
+        .system-nav a:hover {
+            background: var(--blue-accent);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .system-nav a.active {
+            background: var(--dark-blue);
+            color: white;
+        }
+
+        /* Alert Messages */
+        .alert {
+            border-radius: 8px;
+            border: none;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border-left: 4px solid var(--success-green);
+        }
+
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid var(--alert-red);
+        }
+
+        /* Card Styling */
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 3px 15px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Database Status Cards */
         .status-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 20px;
-            max-width: 1300px;
-            width: 100%;
+            margin-bottom: 30px;
         }
-        
+
         .status-card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 25px 20px;
-            text-align: center;
-            box-shadow: 0 6px 18px rgba(0, 0, 100, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .status-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #1a2980 0%, #26d0ce 100%);
-            border-radius: 15px 15px 0 0;
-        }
-        
-        .status-card:hover {
-            transform: translateY(-5px);
             background: white;
-            box-shadow: 0 15px 35px rgba(0, 0, 100, 0.2);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s ease;
         }
-        
+
+        .status-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
         .status-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            margin: 0 auto 15px;
-            background: linear-gradient(135deg, rgba(26, 41, 128, 0.1) 0%, rgba(38, 208, 206, 0.1) 100%);
-            color: #1a2980;
-            transition: all 0.25s ease;
+            font-size: 2em;
+            margin-bottom: 12px;
+            color: var(--dark-blue);
         }
-        
-        .status-card:hover .status-icon {
-            transform: scale(1.1);
-            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
-            color: white;
+
+        .status-title {
+            font-size: 1em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 6px;
         }
-        
-        .status-name {
-            font-size: 20px;
-            font-weight: 700;
+
+        .status-description {
+            color: var(--text-secondary);
+            font-size: 0.85em;
             margin-bottom: 10px;
-            color: #1a2980;
         }
-        
+
         .status-indicator {
             display: inline-flex;
             align-items: center;
@@ -875,81 +991,73 @@ foreach ($backup_files as $file) {
             border-radius: 20px;
             font-size: 12px;
             font-weight: 600;
-            margin-bottom: 10px;
         }
-        
+
         .status-online {
             background: rgba(76, 175, 80, 0.15);
             color: #2e7d32;
             border: 1px solid rgba(76, 175, 80, 0.2);
         }
-        
+
         .status-offline {
             background: rgba(244, 67, 54, 0.15);
             color: #c62828;
             border: 1px solid rgba(244, 67, 54, 0.2);
         }
-        
+
         .status-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
             display: inline-block;
         }
-        
+
         .dot-online {
             background: #4CAF50;
         }
-        
+
         .dot-offline {
             background: #f44336;
         }
-        
-        .status-description {
-            color: #666;
-            font-size: 13px;
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
         }
-        
-        /* ===== BACKUP CONTROL PANEL ===== */
-        .backup-container {
-            max-width: 1300px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 6px 18px rgba(0, 0, 100, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        /* ===== MESSAGE ALERT ===== */
-        .alert-message {
+
+        .stat-card {
             background: white;
             border-radius: 10px;
-            padding: 15px 20px;
-            margin-bottom: 25px;
-            border-left: 4px solid #26d0ce;
-            box-shadow: 0 4px 15px rgba(0, 0, 100, 0.08);
-            font-weight: 500;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--border-color);
         }
-        
-        .alert-success {
-            border-left-color: #4CAF50;
-            background: rgba(76, 175, 80, 0.05);
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: var(--dark-blue);
+            margin: 8px 0;
         }
-        
-        .alert-error {
-            border-left-color: #f44336;
-            background: rgba(244, 67, 54, 0.05);
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            font-weight: 300;
         }
-        
-        /* ===== TAB STYLES ===== */
+
+        /* Tab Navigation */
         .tab-navigation {
             display: flex;
             border-bottom: 2px solid rgba(26, 41, 128, 0.1);
             margin-bottom: 30px;
             overflow-x: auto;
         }
-        
+
         .tab-button {
             padding: 12px 25px;
             background: none;
@@ -963,262 +1071,246 @@ foreach ($backup_files as $file) {
             display: flex;
             align-items: center;
             gap: 8px;
+            font-size: 0.9em;
         }
-        
+
         .tab-button:hover {
-            color: #1a2980;
+            color: var(--dark-blue);
         }
-        
+
         .tab-button.active {
-            color: #1a2980;
-            border-bottom: 3px solid #26d0ce;
+            color: var(--dark-blue);
+            border-bottom: 3px solid var(--dark-blue);
         }
-        
+
         .tab-content {
             display: none;
             animation: fadeIn 0.5s ease;
         }
-        
+
         .tab-content.active {
             display: block;
         }
-        
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        
-        /* ===== BACKUP FORM ===== */
-        .backup-form {
-            background: white;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 4px 15px rgba(0, 0, 100, 0.08);
-            margin-bottom: 30px;
-        }
-        
-        .form-group {
-            margin-bottom: 25px;
-        }
-        
-        .form-label {
-            display: block;
-            margin-bottom: 8px;
-            color: #1a2980;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        
-        .form-control {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid rgba(26, 41, 128, 0.1);
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-        
-        .form-control:focus {
-            border-color: #26d0ce;
-            box-shadow: 0 0 0 3px rgba(38, 208, 206, 0.2);
-            outline: none;
-        }
-        
-        /* ===== FORMAT CARDS ===== */
+
+        /* Backup Format Cards */
         .format-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
             margin: 20px 0;
         }
-        
+
         .format-card {
             border-radius: 10px;
             padding: 20px;
             transition: all 0.3s ease;
             cursor: pointer;
             border: 2px solid transparent;
+            background: white;
+            border: 1px solid var(--border-color);
         }
-        
+
         .format-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0, 0, 100, 0.15);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            border-color: var(--dark-blue);
         }
-        
+
         .format-card.selected {
-            border-color: #26d0ce;
-            background: linear-gradient(135deg, #f9fbff 0%, #e6f0ff 100%);
+            border-color: var(--dark-blue);
+            background: var(--blue-light);
         }
-        
-        .format-card.sql {
-            background: rgba(26, 41, 128, 0.05);
-            border: 2px solid rgba(26, 41, 128, 0.2);
-        }
-        
-        .format-card.excel {
-            background: rgba(38, 208, 206, 0.05);
-            border: 2px solid rgba(38, 208, 206, 0.2);
-        }
-        
+
         .format-icon {
             font-size: 24px;
             margin-bottom: 10px;
+            color: var(--dark-blue);
         }
-        
-        .format-card.sql .format-icon {
-            color: #1a2980;
-        }
-        
-        .format-card.excel .format-icon {
-            color: #26d0ce;
-        }
-        
+
         .format-title {
             font-weight: 700;
             margin-bottom: 10px;
-            color: #1a2980;
+            color: var(--dark-blue);
         }
-        
+
         .format-features {
             list-style: none;
         }
-        
+
         .format-features li {
             padding: 5px 0;
-            color: #666;
-            font-size: 13px;
+            color: var(--text-secondary);
+            font-size: 0.85em;
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        
+
         .format-features li:before {
             content: '✓';
-            color: #26d0ce;
+            color: var(--success-green);
             font-weight: bold;
         }
-        
-        /* ===== BUTTONS ===== */
-        .btn-backup {
-            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 10px;
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--dark-blue);
             font-weight: 600;
-            font-size: 16px;
-            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.9em;
             transition: all 0.3s ease;
+            background: white;
+        }
+
+        .form-control:focus {
+            border-color: var(--dark-blue);
+            box-shadow: 0 0 0 2px rgba(28, 73, 102, 0.1);
+            outline: none;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+            font-weight: 600;
+            border: none;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            width: 100%;
+            gap: 8px;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
         }
-        
-        .btn-backup:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(26, 41, 128, 0.3);
+
+        .btn-primary {
+            background: var(--dark-blue);
         }
-        
+
+        .btn-primary:hover {
+            background: var(--blue-medium);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(28, 73, 102, 0.25);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success-green);
+        }
+
+        .btn-success:hover {
+            background: #4cae4c;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(92, 184, 92, 0.25);
+            color: white;
+        }
+
         .btn-danger {
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-weight: 600;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            width: 100%;
+            background: var(--alert-red);
         }
-        
+
         .btn-danger:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(220, 53, 69, 0.3);
+            background: #d43f3a;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(217, 83, 79, 0.25);
+            color: white;
         }
-        
-        /* ===== BACKUP FILES TABLE ===== */
-        .files-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
+
+        /* Table Styling */
+        .table-container {
             background: white;
             border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0, 0, 100, 0.08);
+            box-shadow: 0 3px 15px rgba(0, 0, 0, 0.05);
+            margin-top: 20px;
         }
-        
-        .files-table thead {
-            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+
+        thead {
+            background: var(--dark-blue);
             color: white;
         }
-        
-        .files-table th {
+
+        th {
             padding: 15px;
             text-align: left;
             font-weight: 600;
-            font-size: 14px;
-            border: none;
+            font-size: 0.9em;
         }
-        
-        .files-table td {
-            padding: 15px;
-            border-bottom: 1px solid rgba(26, 41, 128, 0.1);
-            font-size: 13px;
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border-color);
         }
-        
-        .files-table tbody tr {
-            transition: all 0.2s ease;
+
+        tbody tr:hover {
+            background-color: var(--blue-light);
+            transition: background-color 0.2s ease;
         }
-        
-        .files-table tbody tr:hover {
-            background: linear-gradient(135deg, #f9fbff 0%, #e6f0ff 100%);
-        }
-        
-        /* ===== BADGES ===== */
+
+        /* Badges */
         .file-badge {
             display: inline-flex;
             align-items: center;
             gap: 5px;
             padding: 4px 10px;
             border-radius: 15px;
-            font-size: 11px;
+            font-size: 0.75em;
             font-weight: 600;
             color: white;
         }
-        
+
         .badge-mysql {
             background: linear-gradient(135deg, #4CAF50 0%, #2e7d32 100%);
         }
-        
+
         .badge-sqlserver {
             background: linear-gradient(135deg, #2196F3 0%, #0d47a1 100%);
         }
-        
+
         .badge-postgresql {
             background: linear-gradient(135deg, #673AB7 0%, #311b92 100%);
         }
-        
+
         .badge-format {
             background: linear-gradient(135deg, #FF9800 0%, #ef6c00 100%);
         }
-        
-        /* ===== ACTION BUTTONS ===== */
+
+        /* Action Buttons */
         .action-buttons {
             display: flex;
             gap: 8px;
         }
-        
+
         .btn-action {
-            padding: 8px 15px;
+            padding: 6px 12px;
             border-radius: 6px;
-            font-size: 12px;
+            font-size: 0.8em;
             font-weight: 600;
             border: none;
             cursor: pointer;
@@ -1228,65 +1320,23 @@ foreach ($backup_files as $file) {
             gap: 5px;
             text-decoration: none;
         }
-        
+
         .btn-download {
-            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
+            background: var(--dark-blue);
             color: white;
         }
-        
+
         .btn-delete {
-            background: linear-gradient(135deg, #f44336 0%, #c62828 100%);
+            background: var(--alert-red);
             color: white;
         }
-        
+
         .btn-action:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
-        
-        /* ===== STATS CARDS ===== */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin: 40px 0;
-        }
-        
-        .stat-card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 25px 20px;
-            text-align: center;
-            box-shadow: 0 6px 18px rgba(0, 0, 100, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s ease;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-5px);
-            background: white;
-            box-shadow: 0 15px 35px rgba(0, 0, 100, 0.2);
-        }
-        
-        .stat-value {
-            font-size: 42px;
-            font-weight: 800;
-            margin-bottom: 5px;
-            color: #1a2980;
-            line-height: 1;
-            background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .stat-label {
-            color: #666;
-            font-size: 15px;
-            font-weight: 600;
-        }
-        
-        /* ===== RESTORE WARNING ===== */
+
+        /* Restore Warning */
         .restore-warning {
             background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
             border-left: 4px solid #ffc107;
@@ -1294,7 +1344,7 @@ foreach ($backup_files as $file) {
             border-radius: 10px;
             margin-bottom: 25px;
         }
-        
+
         .restore-warning h4 {
             color: #856404;
             margin-bottom: 10px;
@@ -1302,641 +1352,580 @@ foreach ($backup_files as $file) {
             align-items: center;
             gap: 10px;
         }
-        
+
         .confirmation-input {
             border: 2px solid #dc3545 !important;
             font-weight: bold;
             text-align: center;
             letter-spacing: 2px;
         }
-        
-        /* ===== UPLOAD AREA ===== */
+
+        /* Upload Area */
         .upload-area {
-            border: 2px dashed #26d0ce;
+            border: 2px dashed var(--dark-blue);
             border-radius: 10px;
             padding: 40px;
             text-align: center;
             margin: 20px 0;
-            background: rgba(38, 208, 206, 0.05);
+            background: var(--blue-light);
             transition: all 0.3s ease;
             cursor: pointer;
         }
-        
+
         .upload-area:hover {
-            background: rgba(38, 208, 206, 0.1);
-            border-color: #1a2980;
+            background: rgba(28, 73, 102, 0.1);
+            border-color: var(--blue-accent);
         }
-        
-        /* ===== RESPONSIVE DESIGN ===== */
+
+        /* Responsive Design */
         @media (max-width: 1200px) {
+            .dashboard-container {
+                height: auto;
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+            }
+            
+            .nav-menu {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                padding: 15px;
+            }
+            
+            .nav-section {
+                flex: 1;
+                min-width: 200px;
+                margin-bottom: 15px;
+            }
+            
+            .main-content {
+                width: 100%;
+            }
+            
+            .system-nav {
+                overflow-x: auto;
+            }
+            
             .status-grid,
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
-                max-width: 850px;
-                gap: 20px;
+                gap: 15px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .content-wrapper {
+                padding: 20px;
             }
             
+            .main-header {
+                padding: 15px 20px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            
+            .search-box input {
+                width: 100%;
+            }
+            
+            .header-actions {
+                width: 100%;
+            }
+            
+            .welcome-section {
+                padding: 20px;
+            }
+            
+            .system-nav a {
+                padding: 8px 12px;
+                font-size: 0.85em;
+            }
+            
+            .status-grid,
+            .stats-grid,
             .format-grid {
                 grid-template-columns: 1fr;
             }
             
-            .page-title {
-                font-size: 2.2rem;
+            .card {
+                padding: 20px;
+            }
+            
+            table {
+                font-size: 0.85em;
+            }
+            
+            th, td {
+                padding: 10px;
             }
         }
-        
-        @media (max-width: 992px) {
-            body {
-                padding-top: 140px;
+
+        @media (max-width: 480px) {
+            .sidebar {
+                padding: 15px 0;
             }
             
-            .oval-nav-container {
-                width: calc(100% - 40px);
-                max-width: 600px;
+            .pharmacy-logo h1 {
+                font-size: 1.1em;
             }
             
-            .oval-nav {
+            .user-profile {
                 padding: 15px;
-                flex-direction: column;
-                border-radius: 25px;
             }
             
-            .nav-menu {
-                flex-direction: column;
-                width: 100%;
-                gap: 5px;
-                margin-bottom: 15px;
+            .content-wrapper {
+                padding: 15px;
             }
             
-            .dropdown-menu {
-                position: static;
-                opacity: 1;
-                visibility: visible;
-                transform: none;
-                box-shadow: none;
-                border-radius: 10px;
-                background: #f9f9f9;
-                border: none;
-                display: none;
-                margin: 10px 0;
-            }
-            
-            .nav-item.active .dropdown-menu {
-                display: block;
-            }
-            
-            .user-section {
-                margin-left: 0;
-                padding-left: 0;
-                border-left: none;
-                border-top: 1px solid rgba(26, 41, 128, 0.2);
-                padding-top: 15px;
-                margin-top: 15px;
-                width: 100%;
-                justify-content: center;
-            }
-            
-            .main-content {
-                padding: 0 20px 30px;
-            }
-            
-            .tab-navigation {
-                flex-wrap: nowrap;
-                overflow-x: auto;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .status-grid,
-            .stats-grid {
-                grid-template-columns: 1fr;
-                max-width: 400px;
-                gap: 15px;
-            }
-            
-            .files-table {
-                display: block;
-                overflow-x: auto;
-            }
-            
-            .page-title {
-                font-size: 1.8rem;
-            }
-            
-            .page-subtitle {
-                font-size: 0.9rem;
+            .tab-button {
+                padding: 10px 15px;
+                font-size: 0.8em;
             }
         }
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- OVAL NAVIGATION MENU -->
-    <div class="oval-nav-container" id="ovalNav">
-        <nav class="oval-nav" id="ovalNavInner">
-            <!-- NAVIGATION MENU -->
-            <ul class="nav-menu" id="navMenu">
-                <!-- DASHBOARD -->
-                <li class="nav-item">
-                    <a href="dashboard.php" class="nav-link">
-                        <i class="fas fa-tachometer-alt"></i> Dashboard
-                    </a>
-                </li>
-                
-                <!-- INVENTORY MANAGEMENT -->
-                <li class="nav-item">
-                    <a href="#" class="nav-link">
-                        <i class="fas fa-warehouse"></i> Inventory
-                    </a>
-                    <div class="dropdown-menu">
-                        <div class="dropdown-header">Inventory Management</div>
-                        <a href="medDirectory.php" class="dropdown-item">
-                            <i class="fas fa-list-alt"></i> Medicine List
-                        </a>
-                        <a href="inventory.php" class="dropdown-item">
-                            <i class="fas fa-boxes"></i> Stock Management
-                        </a>
-                        <a href="low_stock.php" class="dropdown-item">
-                            <i class="fas fa-exclamation-triangle"></i> Low Stock Alert
-                        </a>
-                    </div>
-                </li>
-                
-                <!-- PRESCRIPTION MANAGEMENT -->
-                <li class="nav-item">
-                    <a href="#" class="nav-link">
-                        <i class="fas fa-file-medical"></i> Prescriptions
-                    </a>
-                    <div class="dropdown-menu">
-                        <div class="dropdown-header">Prescription Management</div>
-                        <a href="prescriptionDashboard.php" class="dropdown-item">
-                            <i class="fas fa-tachometer-alt"></i> Dashboard
-                        </a>
-                        <a href="add_prescription.php" class="dropdown-item">
-                            <i class="fas fa-plus-circle"></i> New Prescription
-                        </a>
-                        <a href="prescription_history.php" class="dropdown-item">
-                            <i class="fas fa-history"></i> History
-                        </a>
-                    </div>
-                </li>
-                
-                <!-- SALES & BILLING -->
-                <li class="nav-item">
-                    <a href="#" class="nav-link">
-                        <i class="fas fa-cash-register"></i> Sales
-                    </a>
-                    <div class="dropdown-menu">
-                        <div class="dropdown-header">Sales & Billing</div>
-                        <a href="Sales_Billing.php" class="dropdown-item">
-                            <i class="fas fa-chart-line"></i> Dashboard
-                        </a>
-                        <a href="new_sale.php" class="dropdown-item">
-                            <i class="fas fa-shopping-cart"></i> New Sale
-                        </a>
-                        <a href="invoice_history.php" class="dropdown-item">
-                            <i class="fas fa-file-invoice-dollar"></i> Invoice History
-                        </a>
-                    </div>
-                </li>
-                
-                <!-- REPORTS & ANALYTICS -->
-                <li class="nav-item">
-                    <a href="#" class="nav-link">
-                        <i class="fas fa-chart-line"></i> Reports
-                    </a>
-                    <div class="dropdown-menu">
-                        <div class="dropdown-header">Reports & Analytics</div>
-                        <a href="reports.php" class="dropdown-item">
-                            <i class="fas fa-chart-bar"></i> Analytics Dashboard
-                        </a>
-                        <a href="sales_report.php" class="dropdown-item">
-                            <i class="fas fa-chart-pie"></i> Sales Reports
-                        </a>
-                        <a href="inventory_report.php" class="dropdown-item">
-                            <i class="fas fa-chart-area"></i> Inventory Reports
-                        </a>
-                    </div>
-                </li>
-                
-                <!-- BACKUP & RESTORE (Active) -->
-                <li class="nav-item">
-                    <a href="backup.php" class="nav-link" style="background: linear-gradient(135deg, rgba(26, 41, 128, 0.1) 0%, rgba(38, 208, 206, 0.1) 100%);">
-                        <i class="fas fa-database"></i> Backup
-                    </a>
-                    <div class="dropdown-menu">
-                        <div class="dropdown-header">Backup & Restore</div>
-                        <a href="backup.php" class="dropdown-item" style="background: #f9fbff; border-left: 3px solid #26d0ce;">
-                            <i class="fas fa-database"></i> Backup & Restore System
-                        </a>
-                        <div class="dropdown-item" style="background: #f9fbff; border-left: 3px solid #26d0ce; margin: 6px; border-radius: 10px; padding: 12px;">
-                            <div style="font-size: 12px; color: #666;">
-                                <p style="margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                                    <i class="fas fa-check-circle" style="color: #26d0ce;"></i> SQL + Excel formats
-                                </p>
-                                <p style="margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                                    <i class="fas fa-check-circle" style="color: #26d0ce;"></i> Multi-database support
-                                </p>
-                                <p style="display: flex; align-items: center; gap: 6px;">
-                                    <i class="fas fa-check-circle" style="color: #26d0ce;"></i> Full restore functionality
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </li>
-            </ul>
-            
-            <!-- USER SECTION -->
-            <div class="user-section">
-                <div class="user-badge">
-                    <i class="fas fa-user-circle"></i> <?php echo htmlspecialchars($username); ?> (<?php echo htmlspecialchars($userRole); ?>)
-                </div>
-                <button class="logout-btn" onclick="window.location.href='logout.php'">
-                    <i class="fas fa-sign-out-alt"></i> Log Out
-                </button>
+    <!-- DASHBOARD CONTAINER - EXACT SAME STRUCTURE -->
+    <div class="dashboard-container">
+        <!-- SIDEBAR - EXACT SAME AS DASHBOARD -->
+        <aside class="sidebar">
+            <div class="pharmacy-logo">
+                <h1><i class="fas fa-pills"></i> PHARMACY SYSTEM</h1>
+                <p>Professional Healthcare Management</p>
             </div>
-        </nav>
-    </div>
 
-    <!-- PAGE HEADER -->
-    <div class="page-header">
-        <h1 class="page-title">Backup & Restore System</h1>
-        <p class="page-subtitle">Backup, restore, and manage data from all connected databases</p>
-    </div>
+            <div class="user-profile">
+                <div class="user-avatar">
+                    <?php echo strtoupper(substr($username, 0, 2)); ?>
+                </div>
+                <div class="user-info">
+                    <div class="user-name"><?php echo htmlspecialchars($username); ?></div>
+                    <div class="user-role"><?php echo htmlspecialchars($userRole); ?></div>
+                </div>
+            </div>
 
-    <!-- MAIN CONTENT -->
-    <div class="main-content">
-        <?php if ($message): ?>
-            <div class="alert-message <?php echo $message_type === 'success' ? 'alert-success' : 'alert-error'; ?>">
-                <?php echo $message; ?>
-            </div>
-        <?php endif; ?>
-        
-        <!-- DATABASE STATUS -->
-        <div class="status-container">
-            <div class="status-grid">
-                <div class="status-card">
-                    <div class="status-icon">
-                        <i class="fas fa-database"></i>
-                    </div>
-                    <div class="status-name">MySQL</div>
-                    <div class="status-indicator <?php echo $mysql_available ? 'status-online' : 'status-offline'; ?>">
-                        <span class="status-dot <?php echo $mysql_available ? 'dot-online' : 'dot-offline'; ?>"></span>
-                        <?php echo $mysql_available ? 'Connected' : 'Not Connected'; ?>
-                    </div>
-                    <div class="status-description">Your Local Database (Full Backup & Restore)</div>
+            <nav class="nav-menu">
+                <div class="nav-section">
+                    <div class="nav-title">Medical Operations</div>
+                    <ul class="nav-links">
+                        <li><a href="dashboard.php"><i class="fas fa-home nav-icon"></i>Dashboard</a></li>
+                        <li><a href="medDirectory.php"><i class="fas fa-pills nav-icon"></i>Medicine Inventory</a></li>
+                        <li><a href="prescriptionDashboard.php"><i class="fas fa-prescription nav-icon"></i>Prescriptions</a></li>
+                        <li><a href="Sales_Billing.php"><i class="fas fa-cash-register nav-icon"></i>Sales & Billing</a></li>
+                    </ul>
                 </div>
+
+                <div class="nav-section">
+                    <div class="nav-title">Administration</div>
+                    <ul class="nav-links">
+                        <li><a href="user_management.php"><i class="fas fa-users nav-icon"></i>User Management</a></li>
+                        <li><a href="reports.php"><i class="fas fa-chart-bar nav-icon"></i>Reports & Analytics</a></li>
+                        <li><a href="backup.php" class="active"><i class="fas fa-database nav-icon"></i>Backup & Restore</a></li>
+                    </ul>
+                </div>
+            </nav>
+
+            <button class="logout-btn" onclick="window.location.href='logout.php'">
+                <i class="fas fa-sign-out-alt"></i> Log Out
+            </button>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <header class="main-header">
+                <div class="header-title">
+                    <h1>Backup & Restore</h1>
+                    <p>Manage database backups and restorations - <?php echo date('l, F j, Y'); ?></p>
+                </div>
+                <div class="header-actions">
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" placeholder="Search backup files...">
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <!-- Welcome Section -->
+                <section class="welcome-section">
+                    <div class="welcome-text">
+                        <h2><i class="fas fa-database"></i> Backup & Restore Console</h2>
+                        <p>Backup, restore, and manage data from all connected databases</p>
+                    </div>
+                </section>
+
+                <!-- System Navigation -->
+                <div class="system-nav">
+                    <a href="dashboard.php"><i class="fas fa-home"></i> Dashboard</a>
+                    <a href="user_management.php"><i class="fas fa-users"></i> User Management</a>
+                    <a href="medDirectory.php"><i class="fas fa-pills"></i> Medicine Inventory</a>
+                    <a href="Sales_Billing.php"><i class="fas fa-cash-register"></i> Sales & Billing</a>
+                    <a href="reports.php"><i class="fas fa-chart-bar"></i> Reports & Analytics</a>
+                    <a href="backup.php" class="active"><i class="fas fa-database"></i> Backup & Restore</a>
+                </div>
+
+                <!-- Messages -->
+                <?php if ($message): ?>
+                    <div class="alert <?php echo $message_type === 'success' ? 'alert-success' : 'alert-danger'; ?>">
+                        <?php echo $message; ?>
+                    </div>
+                <?php endif; ?>
                 
-                <div class="status-card">
-                    <div class="status-icon">
-                        <i class="fas fa-server"></i>
-                    </div>
-                    <div class="status-name">SQL Server</div>
-                    <div class="status-indicator <?php echo $sqlserver_available ? 'status-online' : 'status-offline'; ?>">
-                        <span class="status-dot <?php echo $sqlserver_available ? 'dot-online' : 'dot-offline'; ?>"></span>
-                        <?php echo $sqlserver_available ? 'Connected' : 'Not Connected'; ?>
-                    </div>
-                    <div class="status-description">Team Member Database (Backup Only)</div>
-                </div>
-                
-                <div class="status-card">
-                    <div class="status-icon">
-                        <i class="fas fa-database"></i>
-                    </div>
-                    <div class="status-name">PostgreSQL</div>
-                    <div class="status-indicator <?php echo $postgresql_available ? 'status-online' : 'status-offline'; ?>">
-                        <span class="status-dot <?php echo $postgresql_available ? 'dot-online' : 'dot-offline'; ?>"></span>
-                        <?php echo $postgresql_available ? 'Connected' : 'Not Connected'; ?>
-                    </div>
-                    <div class="status-description">Team Member Database (Backup Only)</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- BACKUP STATISTICS -->
-        <div class="status-container">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value"><?php echo count($backup_files); ?></div>
-                    <div class="stat-label">Total Backups</div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-value">
-                        <?php
-                        echo formatBytes($total_size);
-                        ?>
-                    </div>
-                    <div class="stat-label">Storage Used</div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-value">
-                        <?php echo count(array_filter($backup_files, function($f) { return strpos($f, '_mysql_') !== false; })); ?>
-                    </div>
-                    <div class="stat-label">MySQL Backups</div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-value">
-                        <?php echo count(array_filter($backup_files, function($f) { 
-                            return strpos($f, '_sqlserver_') !== false || strpos($f, '_postgresql_') !== false; 
-                        })); ?>
-                    </div>
-                    <div class="stat-label">Team Backups</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- BACKUP CONTROL PANEL -->
-        <div class="backup-container">
-            <!-- TAB NAVIGATION -->
-            <div class="tab-navigation">
-                <button class="tab-button active" onclick="showTab('create')">
-                    <i class="fas fa-plus-circle"></i> Create Backup
-                </button>
-                <button class="tab-button" onclick="showTab('restore')">
-                    <i class="fas fa-history"></i> Restore
-                </button>
-                <button class="tab-button" onclick="showTab('upload')">
-                    <i class="fas fa-upload"></i> Upload
-                </button>
-                <button class="tab-button" onclick="showTab('files')">
-                    <i class="fas fa-folder-open"></i> Backup Files
-                </button>
-            </div>
-            
-            <!-- CREATE BACKUP TAB -->
-            <div id="tab-create" class="tab-content active">
-                <div class="backup-form">
-                    <h3 style="color: #1a2980; margin-bottom: 25px; text-align: center;">
-                        <i class="fas fa-cloud-upload-alt"></i> Create New Database Backup
+                <!-- Database Status -->
+                <div class="card">
+                    <h3 style="color: var(--dark-blue); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-server"></i> Database Status
                     </h3>
-                    
-                    <form method="POST" action="">
-                        <div class="form-group">
-                            <label class="form-label">Select Database</label>
-                            <select name="database_type" class="form-control" onchange="updateDbStatus(this.value)">
-                                <option value="mysql" <?php echo $mysql_available ? '' : 'disabled'; ?>>
-                                    MySQL <?php echo $mysql_available ? '✅ Connected' : '❌ Not Connected'; ?>
-                                </option>
-                                <option value="sqlserver" <?php echo $sqlserver_available ? '' : 'disabled'; ?>>
-                                    SQL Server <?php echo $sqlserver_available ? '✅ Connected' : '❌ Not Connected'; ?>
-                                </option>
-                                <option value="postgresql" <?php echo $postgresql_available ? '' : 'disabled'; ?>>
-                                    PostgreSQL <?php echo $postgresql_available ? '✅ Connected' : '❌ Not Connected'; ?>
-                                </option>
-                            </select>
-                            <small id="db-status-text" style="color: #666; margin-top: 5px; display: block;">
-                                <?php echo $mysql_available ? 'MySQL is available for backup' : 'Select an available database'; ?>
-                            </small>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Backup Format</label>
-                            <div class="format-grid">
-                                <div class="format-card sql" onclick="selectFormat('sql')" id="format-sql">
-                                    <div class="format-icon">
-                                        <i class="fas fa-database"></i>
-                                    </div>
-                                    <div class="format-title">SQL Format</div>
-                                    <ul class="format-features">
-                                        <li>Creates .sql file</li>
-                                        <li>Contains INSERT statements</li>
-                                        <li>Best for database restoration</li>
-                                        <li>Compatible with all databases</li>
-                                    </ul>
-                                </div>
-                                
-                                <div class="format-card excel" onclick="selectFormat('excel')" id="format-excel">
-                                    <div class="format-icon">
-                                        <i class="fas fa-file-excel"></i>
-                                    </div>
-                                    <div class="format-title">Excel/CSV Format</div>
-                                    <ul class="format-features">
-                                        <li>Creates .zip with CSV files</li>
-                                        <li>Open in Excel/Google Sheets</li>
-                                        <li>Best for reporting/analysis</li>
-                                        <li>Easy data sharing</li>
-                                    </ul>
-                                </div>
+                    <div class="status-grid">
+                        <div class="status-card">
+                            <div class="status-icon">
+                                <i class="fas fa-database"></i>
                             </div>
-                            <input type="hidden" name="backup_format" id="backup_format" value="sql">
+                            <div class="status-name">MySQL</div>
+                            <div class="status-indicator <?php echo $mysql_available ? 'status-online' : 'status-offline'; ?>">
+                                <span class="status-dot <?php echo $mysql_available ? 'dot-online' : 'dot-offline'; ?>"></span>
+                                <?php echo $mysql_available ? 'Connected' : 'Not Connected'; ?>
+                            </div>
+                            <div class="status-description">Your Local Database (Full Backup & Restore)</div>
                         </div>
                         
-                        <div class="form-group">
-                            <label class="form-label">Backup Name (Optional)</label>
-                            <input type="text" name="backup_name" class="form-control" 
-                                   value="Pharmacy_Backup_<?php echo date('Y-m-d'); ?>" 
-                                   placeholder="Enter a descriptive name for your backup">
+                        <div class="status-card">
+                            <div class="status-icon">
+                                <i class="fas fa-server"></i>
+                            </div>
+                            <div class="status-name">SQL Server</div>
+                            <div class="status-indicator <?php echo $sqlserver_available ? 'status-online' : 'status-offline'; ?>">
+                                <span class="status-dot <?php echo $sqlserver_available ? 'dot-online' : 'dot-offline'; ?>"></span>
+                                <?php echo $sqlserver_available ? 'Connected' : 'Not Connected'; ?>
+                            </div>
+                            <div class="status-description">Team Member Database (Backup Only)</div>
                         </div>
                         
-                        <button type="submit" name="create_backup" class="btn-backup">
-                            <i class="fas fa-rocket"></i> Create Backup Now
-                        </button>
-                        
-                        <p style="margin-top: 15px; text-align: center; color: #666; font-size: 13px;">
-                            <i class="fas fa-info-circle"></i> This will backup all tables: USER, PATIENT, MEDICINE, PRESCRIPTION, PRESCRIPTION_DETAIL
-                        </p>
-                    </form>
-                </div>
-            </div>
-            
-            <!-- RESTORE TAB -->
-            <div id="tab-restore" class="tab-content">
-                <div class="backup-form">
-                    <h3 style="color: #1a2980; margin-bottom: 25px; text-align: center;">
-                        <i class="fas fa-history"></i> Restore Database from Backup
-                    </h3>
-                    
-                    <div class="restore-warning">
-                        <h4><i class="fas fa-exclamation-triangle"></i> IMPORTANT WARNING</h4>
-                        <p>Restoring a backup will OVERWRITE all existing data in the selected database. This action cannot be undone.</p>
-                        <ul style="margin: 10px 0; padding-left: 20px;">
-                            <li>Make sure you have a current backup before proceeding</li>
-                            <li>Only restore to the same database type (MySQL to MySQL, etc.)</li>
-                            <li>Large restores may take several minutes</li>
-                            <li>All users will be logged out during restoration</li>
-                        </ul>
+                        <div class="status-card">
+                            <div class="status-icon">
+                                <i class="fas fa-database"></i>
+                            </div>
+                            <div class="status-name">PostgreSQL</div>
+                            <div class="status-indicator <?php echo $postgresql_available ? 'status-online' : 'status-offline'; ?>">
+                                <span class="status-dot <?php echo $postgresql_available ? 'dot-online' : 'dot-offline'; ?>"></span>
+                                <?php echo $postgresql_available ? 'Connected' : 'Not Connected'; ?>
+                            </div>
+                            <div class="status-description">Team Member Database (Backup Only)</div>
+                        </div>
                     </div>
-                    
-                    <form method="POST" action="" onsubmit="return confirmRestore()">
-                        <div class="form-group">
-                            <label class="form-label">Select Backup File</label>
-                            <select name="backup_file" class="form-control" required>
-                                <option value="">-- Select a backup file --</option>
-                                <?php foreach ($backup_files as $file): 
-                                    $filepath = $db_backup_dir . $file;
-                                    if (file_exists($filepath)):
+                </div>
+                
+                <!-- Backup Statistics -->
+                <div class="card">
+                    <h3 style="color: var(--dark-blue); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-chart-bar"></i> Backup Statistics
+                    </h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value"><?php echo count($backup_files); ?></div>
+                            <div class="stat-label">Total Backups</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-value">
+                                <?php
+                                echo formatBytes($total_size);
                                 ?>
-                                    <option value="<?php echo htmlspecialchars($file); ?>">
-                                        <?php echo htmlspecialchars($file); ?> 
-                                        (<?php echo date('M d, Y H:i', filemtime($filepath)); ?>)
+                            </div>
+                            <div class="stat-label">Storage Used</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-value">
+                                <?php echo count(array_filter($backup_files, function($f) { return strpos($f, '_mysql_') !== false; })); ?>
+                            </div>
+                            <div class="stat-label">MySQL Backups</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-value">
+                                <?php echo count(array_filter($backup_files, function($f) { 
+                                    return strpos($f, '_sqlserver_') !== false || strpos($f, '_postgresql_') !== false; 
+                                })); ?>
+                            </div>
+                            <div class="stat-label">Team Backups</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Backup Control Panel -->
+                <div class="card">
+                    <!-- Tab Navigation -->
+                    <div class="tab-navigation">
+                        <button class="tab-button active" onclick="showTab('create')">
+                            <i class="fas fa-plus-circle"></i> Create Backup
+                        </button>
+                        <button class="tab-button" onclick="showTab('restore')">
+                            <i class="fas fa-history"></i> Restore
+                        </button>
+                        <button class="tab-button" onclick="showTab('upload')">
+                            <i class="fas fa-upload"></i> Upload
+                        </button>
+                        <button class="tab-button" onclick="showTab('files')">
+                            <i class="fas fa-folder-open"></i> Backup Files
+                        </button>
+                    </div>
+                    
+                    <!-- CREATE BACKUP TAB -->
+                    <div id="tab-create" class="tab-content active">
+                        <h4 style="color: var(--dark-blue); margin-bottom: 20px; text-align: center;">
+                            <i class="fas fa-cloud-upload-alt"></i> Create New Database Backup
+                        </h4>
+                        
+                        <form method="POST" action="">
+                            <div class="form-group">
+                                <label class="form-label">Select Database</label>
+                                <select name="database_type" class="form-control" onchange="updateDbStatus(this.value)">
+                                    <option value="mysql" <?php echo $mysql_available ? '' : 'disabled'; ?>>
+                                        MySQL <?php echo $mysql_available ? '✅ Connected' : '❌ Not Connected'; ?>
                                     </option>
-                                <?php endif; endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Target Database</label>
-                            <select name="database_type" class="form-control" required>
-                                <option value="mysql" <?php echo $mysql_available ? '' : 'disabled'; ?>>
-                                    MySQL <?php echo $mysql_available ? '✅ Connected' : '❌ Not Connected'; ?>
-                                </option>
-                                <option value="sqlserver" disabled>SQL Server (Restore not available)</option>
-                                <option value="postgresql" disabled>PostgreSQL (Restore not available)</option>
-                            </select>
-                            <small style="color: #666; margin-top: 5px; display: block;">
-                                Note: Restoration is only available for MySQL. Team databases are read-only.
-                            </small>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">
-                                <i class="fas fa-exclamation-circle"></i> Type "YES" to confirm
-                            </label>
-                            <input type="text" name="confirmation" class="form-control confirmation-input" 
-                                   placeholder="TYPE: YES" required pattern="YES">
-                            <small style="color: #666; margin-top: 5px; display: block;">
-                                This is required to prevent accidental data loss
-                            </small>
-                        </div>
-                        
-                        <button type="submit" name="restore_backup" class="btn-danger">
-                            <i class="fas fa-bomb"></i> RESTORE DATABASE NOW
-                        </button>
-                    </form>
-                </div>
-            </div>
-            
-            <!-- UPLOAD TAB -->
-            <div id="tab-upload" class="tab-content">
-                <div class="backup-form">
-                    <h3 style="color: #1a2980; margin-bottom: 25px; text-align: center;">
-                        <i class="fas fa-cloud-upload-alt"></i> Upload Backup File
-                    </h3>
-                    
-                    <form method="POST" action="" enctype="multipart/form-data">
-                        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                            <i class="fas fa-file-upload" style="font-size: 48px; color: #26d0ce; margin-bottom: 15px;"></i>
-                            <h4>Click to select backup file</h4>
-                            <p style="color: #666;">Supported formats: .sql, .zip</p>
-                            <p style="color: #999; font-size: 12px;">Max file size: 50MB</p>
-                            <input type="file" id="fileInput" name="backup_file" 
-                                   accept=".sql,.zip" style="display: none;" 
-                                   onchange="document.getElementById('fileName').textContent = this.files[0].name">
-                            <div id="fileName" style="margin-top: 15px; font-weight: 600; color: #1a2980;"></div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">File Description (Optional)</label>
-                            <input type="text" name="description" class="form-control" 
-                                   placeholder="e.g., Emergency backup from Dec 2024">
-                        </div>
-                        
-                        <button type="submit" name="upload_restore" class="btn-backup">
-                            <i class="fas fa-upload"></i> Upload Backup File
-                        </button>
-                    </form>
-                </div>
-            </div>
-            
-            <!-- BACKUP FILES TAB -->
-            <div id="tab-files" class="tab-content">
-                <div style="background: white; border-radius: 10px; padding: 20px;">
-                    <h3 style="color: #1a2980; margin-bottom: 20px; text-align: center;">
-                        <i class="fas fa-archive"></i> Backup Files Archive
-                    </h3>
-                    
-                    <?php if (count($backup_files) > 0): ?>
-                        <table class="files-table">
-                            <thead>
-                                <tr>
-                                    <th>Filename</th>
-                                    <th>Database</th>
-                                    <th>Format</th>
-                                    <th>Size</th>
-                                    <th>Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($backup_files as $file): 
-                                    $filepath = $db_backup_dir . $file;
-                                    $filesize = file_exists($filepath) ? formatBytes(filesize($filepath)) : 'N/A';
-                                    $filedate = file_exists($filepath) ? date('M d, Y H:i', filemtime($filepath)) : 'N/A';
-                                    $fileext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                                    <option value="sqlserver" <?php echo $sqlserver_available ? '' : 'disabled'; ?>>
+                                        SQL Server <?php echo $sqlserver_available ? '✅ Connected' : '❌ Not Connected'; ?>
+                                    </option>
+                                    <option value="postgresql" <?php echo $postgresql_available ? '' : 'disabled'; ?>>
+                                        PostgreSQL <?php echo $postgresql_available ? '✅ Connected' : '❌ Not Connected'; ?>
+                                    </option>
+                                </select>
+                                <small id="db-status-text" style="color: var(--text-secondary); margin-top: 5px; display: block;">
+                                    <?php echo $mysql_available ? 'MySQL is available for backup' : 'Select an available database'; ?>
+                                </small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Backup Format</label>
+                                <div class="format-grid">
+                                    <div class="format-card" onclick="selectFormat('sql')" id="format-sql">
+                                        <div class="format-icon">
+                                            <i class="fas fa-database"></i>
+                                        </div>
+                                        <div class="format-title">SQL Format</div>
+                                        <ul class="format-features">
+                                            <li>Creates .sql file</li>
+                                            <li>Contains INSERT statements</li>
+                                            <li>Best for database restoration</li>
+                                            <li>Compatible with all databases</li>
+                                        </ul>
+                                    </div>
                                     
-                                    // Determine database type from filename
-                                    if (strpos($file, '_mysql_') !== false) {
-                                        $db_type = 'MySQL';
-                                        $db_class = 'badge-mysql';
-                                    } elseif (strpos($file, '_sqlserver_') !== false) {
-                                        $db_type = 'SQL Server';
-                                        $db_class = 'badge-sqlserver';
-                                    } elseif (strpos($file, '_postgresql_') !== false) {
-                                        $db_type = 'PostgreSQL';
-                                        $db_class = 'badge-postgresql';
-                                    } else {
-                                        $db_type = 'Unknown';
-                                        $db_class = 'badge-format';
-                                    }
-                                    
-                                    $format = ($fileext === 'zip') ? 'Excel/CSV' : 'SQL';
-                                ?>
-                                    <tr>
-                                        <td style="font-weight: 600;"><?php echo htmlspecialchars($file); ?></td>
-                                        <td><span class="file-badge <?php echo $db_class; ?>"><?php echo $db_type; ?></span></td>
-                                        <td><span class="file-badge badge-format"><?php echo $format; ?></span></td>
-                                        <td><?php echo $filesize; ?></td>
-                                        <td><?php echo $filedate; ?></td>
-                                        <td>
-                                            <div class="action-buttons">
-                                                <a href="backups/database/<?php echo urlencode($file); ?>" 
-                                                   download class="btn-action btn-download">
-                                                    <i class="fas fa-download"></i> Download
-                                                </a>
-                                                <a href="?delete=<?php echo urlencode($file); ?>" 
-                                                   class="btn-action btn-delete"
-                                                   onclick="return confirm('Are you sure you want to delete <?php echo htmlspecialchars($file); ?>?')">
-                                                    <i class="fas fa-trash"></i> Delete
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    <?php else: ?>
-                        <div style="text-align: center; padding: 40px; background: #f8f9fa; border-radius: 8px;">
-                            <i class="fas fa-folder-open" style="font-size: 48px; color: #ccc; margin-bottom: 15px;"></i>
-                            <p style="color: #666; font-size: 1.1em;">No backup files found</p>
-                            <p style="color: #999; margin-top: 10px;">Create your first backup using the "Create Backup" tab</p>
+                                    <div class="format-card" onclick="selectFormat('excel')" id="format-excel">
+                                        <div class="format-icon">
+                                            <i class="fas fa-file-excel"></i>
+                                        </div>
+                                        <div class="format-title">Excel/CSV Format</div>
+                                        <ul class="format-features">
+                                            <li>Creates .zip with CSV files</li>
+                                            <li>Open in Excel/Google Sheets</li>
+                                            <li>Best for reporting/analysis</li>
+                                            <li>Easy data sharing</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="backup_format" id="backup_format" value="sql">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Backup Name (Optional)</label>
+                                <input type="text" name="backup_name" class="form-control" 
+                                       value="Pharmacy_Backup_<?php echo date('Y-m-d'); ?>" 
+                                       placeholder="Enter a descriptive name for your backup">
+                            </div>
+                            
+                            <button type="submit" name="create_backup" class="btn btn-primary" style="width: 100%;">
+                                <i class="fas fa-rocket"></i> Create Backup Now
+                            </button>
+                            
+                            <p style="margin-top: 15px; text-align: center; color: var(--text-secondary); font-size: 0.85em;">
+                                <i class="fas fa-info-circle"></i> This will backup all tables: USER, PATIENT, MEDICINE, PRESCRIPTION, PRESCRIPTION_DETAIL
+                            </p>
+                        </form>
+                    </div>
+                    
+                    <!-- RESTORE TAB -->
+                    <div id="tab-restore" class="tab-content">
+                        <h4 style="color: var(--dark-blue); margin-bottom: 20px; text-align: center;">
+                            <i class="fas fa-history"></i> Restore Database from Backup
+                        </h4>
+                        
+                        <div class="restore-warning">
+                            <h4><i class="fas fa-exclamation-triangle"></i> IMPORTANT WARNING</h4>
+                            <p>Restoring a backup will OVERWRITE all existing data in the selected database. This action cannot be undone.</p>
+                            <ul style="margin: 10px 0; padding-left: 20px;">
+                                <li>Make sure you have a current backup before proceeding</li>
+                                <li>Only restore to the same database type (MySQL to MySQL, etc.)</li>
+                                <li>Large restores may take several minutes</li>
+                                <li>All users will be logged out during restoration</li>
+                            </ul>
                         </div>
-                    <?php endif; ?>
+                        
+                        <form method="POST" action="" onsubmit="return confirmRestore()">
+                            <div class="form-group">
+                                <label class="form-label">Select Backup File</label>
+                                <select name="backup_file" class="form-control" required>
+                                    <option value="">-- Select a backup file --</option>
+                                    <?php foreach ($backup_files as $file): 
+                                        $filepath = $db_backup_dir . $file;
+                                        if (file_exists($filepath)):
+                                    ?>
+                                        <option value="<?php echo htmlspecialchars($file); ?>">
+                                            <?php echo htmlspecialchars($file); ?> 
+                                            (<?php echo date('M d, Y H:i', filemtime($filepath)); ?>)
+                                        </option>
+                                    <?php endif; endforeach; ?>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Target Database</label>
+                                <select name="database_type" class="form-control" required>
+                                    <option value="mysql" <?php echo $mysql_available ? '' : 'disabled'; ?>>
+                                        MySQL <?php echo $mysql_available ? '✅ Connected' : '❌ Not Connected'; ?>
+                                    </option>
+                                    <option value="sqlserver" disabled>SQL Server (Restore not available)</option>
+                                    <option value="postgresql" disabled>PostgreSQL (Restore not available)</option>
+                                </select>
+                                <small style="color: var(--text-secondary); margin-top: 5px; display: block;">
+                                    Note: Restoration is only available for MySQL. Team databases are read-only.
+                                </small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <i class="fas fa-exclamation-circle"></i> Type "YES" to confirm
+                                </label>
+                                <input type="text" name="confirmation" class="form-control confirmation-input" 
+                                       placeholder="TYPE: YES" required pattern="YES">
+                                <small style="color: var(--text-secondary); margin-top: 5px; display: block;">
+                                    This is required to prevent accidental data loss
+                                </small>
+                            </div>
+                            
+                            <button type="submit" name="restore_backup" class="btn btn-danger" style="width: 100%;">
+                                <i class="fas fa-bomb"></i> RESTORE DATABASE NOW
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- UPLOAD TAB -->
+                    <div id="tab-upload" class="tab-content">
+                        <h4 style="color: var(--dark-blue); margin-bottom: 20px; text-align: center;">
+                            <i class="fas fa-cloud-upload-alt"></i> Upload Backup File
+                        </h4>
+                        
+                        <form method="POST" action="" enctype="multipart/form-data">
+                            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                                <i class="fas fa-file-upload" style="font-size: 48px; color: var(--dark-blue); margin-bottom: 15px;"></i>
+                                <h4>Click to select backup file</h4>
+                                <p style="color: var(--text-secondary);">Supported formats: .sql, .zip</p>
+                                <p style="color: var(--soft-grey); font-size: 0.85em;">Max file size: 50MB</p>
+                                <input type="file" id="fileInput" name="backup_file" 
+                                       accept=".sql,.zip" style="display: none;" 
+                                       onchange="document.getElementById('fileName').textContent = this.files[0].name">
+                                <div id="fileName" style="margin-top: 15px; font-weight: 600; color: var(--dark-blue);"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">File Description (Optional)</label>
+                                <input type="text" name="description" class="form-control" 
+                                       placeholder="e.g., Emergency backup from Dec 2024">
+                            </div>
+                            
+                            <button type="submit" name="upload_restore" class="btn btn-primary" style="width: 100%;">
+                                <i class="fas fa-upload"></i> Upload Backup File
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- BACKUP FILES TAB -->
+                    <div id="tab-files" class="tab-content">
+                        <h4 style="color: var(--dark-blue); margin-bottom: 20px; text-align: center;">
+                            <i class="fas fa-archive"></i> Backup Files Archive
+                        </h4>
+                        
+                        <?php if (count($backup_files) > 0): ?>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Filename</th>
+                                            <th>Database</th>
+                                            <th>Format</th>
+                                            <th>Size</th>
+                                            <th>Date</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($backup_files as $file): 
+                                            $filepath = $db_backup_dir . $file;
+                                            $filesize = file_exists($filepath) ? formatBytes(filesize($filepath)) : 'N/A';
+                                            $filedate = file_exists($filepath) ? date('M d, Y H:i', filemtime($filepath)) : 'N/A';
+                                            $fileext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                                            
+                                            // Determine database type from filename
+                                            if (strpos($file, '_mysql_') !== false) {
+                                                $db_type = 'MySQL';
+                                                $db_class = 'badge-mysql';
+                                            } elseif (strpos($file, '_sqlserver_') !== false) {
+                                                $db_type = 'SQL Server';
+                                                $db_class = 'badge-sqlserver';
+                                            } elseif (strpos($file, '_postgresql_') !== false) {
+                                                $db_type = 'PostgreSQL';
+                                                $db_class = 'badge-postgresql';
+                                            } else {
+                                                $db_type = 'Unknown';
+                                                $db_class = 'badge-format';
+                                            }
+                                            
+                                            $format = ($fileext === 'zip') ? 'Excel/CSV' : 'SQL';
+                                        ?>
+                                            <tr>
+                                                <td style="font-weight: 600; font-size: 0.9em;"><?php echo htmlspecialchars($file); ?></td>
+                                                <td><span class="file-badge <?php echo $db_class; ?>"><?php echo $db_type; ?></span></td>
+                                                <td><span class="file-badge badge-format"><?php echo $format; ?></span></td>
+                                                <td><?php echo $filesize; ?></td>
+                                                <td><?php echo $filedate; ?></td>
+                                                <td>
+                                                    <div class="action-buttons">
+                                                        <a href="backups/database/<?php echo urlencode($file); ?>" 
+                                                           download class="btn-action btn-download">
+                                                            <i class="fas fa-download"></i> Download
+                                                        </a>
+                                                        <a href="?delete=<?php echo urlencode($file); ?>" 
+                                                           class="btn-action btn-delete"
+                                                           onclick="return confirm('Are you sure you want to delete <?php echo htmlspecialchars($file); ?>?')">
+                                                            <i class="fas fa-trash"></i> Delete
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div style="text-align: center; padding: 40px; background: var(--blue-light); border-radius: 8px;">
+                                <i class="fas fa-folder-open" style="font-size: 48px; color: var(--border-color); margin-bottom: 15px;"></i>
+                                <p style="color: var(--text-secondary); font-size: 1.1em;">No backup files found</p>
+                                <p style="color: var(--soft-grey); margin-top: 10px;">Create your first backup using the "Create Backup" tab</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
 
     <script>
-        // Scroll effect for oval navigation
-        const ovalNav = document.getElementById('ovalNav');
-        const ovalNavInner = document.getElementById('ovalNavInner');
-        
-        window.addEventListener('scroll', () => {
-            if (window.innerWidth > 992) {
-                if (window.scrollY > 50) {
-                    ovalNav.classList.add('scrolled');
-                    ovalNavInner.classList.add('scrolled');
-                } else {
-                    ovalNav.classList.remove('scrolled');
-                    ovalNavInner.classList.remove('scrolled');
-                }
-            }
-        });
-        
         // Tab functionality
         function showTab(tabName) {
             // Hide all tabs
@@ -2000,6 +1989,47 @@ foreach ($backup_files as $file) {
             if (select) {
                 updateDbStatus(select.value);
             }
+            
+            // Search functionality
+            document.querySelector('.search-box input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const searchTerm = this.value.trim();
+                    if (searchTerm) {
+                        // Implement search functionality here
+                        alert('Search function would filter backup files. Implementation pending.');
+                    }
+                }
+            });
+            
+            // Clear search on escape
+            document.querySelector('.search-box input').addEventListener('keyup', function(e) {
+                if (e.key === 'Escape') {
+                    this.value = '';
+                }
+            });
+        });
+        
+        // Sidebar navigation active state
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                // Store active page in sessionStorage before navigation
+                sessionStorage.setItem('activePage', this.getAttribute('href'));
+            });
+        });
+        
+        // Restore active page on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPage = window.location.pathname.split('/').pop();
+            const activePage = sessionStorage.getItem('activePage') || 'backup.php';
+            
+            document.querySelectorAll('.nav-links a').forEach(link => {
+                const linkPage = link.getAttribute('href');
+                link.classList.remove('active');
+                
+                if (linkPage === currentPage || linkPage === activePage) {
+                    link.classList.add('active');
+                }
+            });
         });
     </script>
 </body>
