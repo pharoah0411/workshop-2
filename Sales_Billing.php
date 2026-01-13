@@ -158,13 +158,17 @@ usort($prescriptions, function($a, $b) {
 </head>
 <body <?= $is_print_mode ? 'onload="window.print()"' : '' ?>>
 
-<header class="top-nav no-print">
+<div class="top-nav">
     <div>Welcome, <strong><?= htmlspecialchars($username ?? '') ?></strong></div>
     <div class="nav-links">
         <a href="dashboard.php">🏠 Home</a>
-        <a href="prescriptionDashboard.php">📝 Prescriptions</a>
+        <a href="user_management.php" class="nav-btn">👤 User Management</a>
+        <a href="medDirectory.php" class="nav-btn">💊 Med Inventory</a>
+        <span class="nav-btn active">💰 Sales & Billing</span>
+        <a href="reports.php" class="nav-btn">📊 Report</a>
+        <a href="viewPrescription.php" class="nav-btn">📈 Prescription</a>
     </div>
-</header>
+</div>
 
 <div class="container">
     <div class="no-print" style="text-align: center; margin-bottom: 30px;">
