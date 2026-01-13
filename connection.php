@@ -11,6 +11,7 @@ error_reporting(E_ALL);
 $mysql_conn2 = null; // MySQL #2
 $pg_conn = null;     // PostgreSQL
 $pdo_sqlsrv = null;  // SQL Server (PDO)
+$pdo         = null; // ✅ ALIAS for backward compatibility
 
 // Debug mode - set to false in production
 $debug = true;
@@ -83,6 +84,9 @@ try {
     $pdo_sqlsrv = new PDO($dsn, $uid, $pass);
     $pdo_sqlsrv->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo_sqlsrv->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+    // ✅ CREATE ALIAS
+    $pdo = $pdo_sqlsrv;
     
     if ($debug) {
         echo "<!-- SQL Server: Connected -->\n";
