@@ -142,7 +142,7 @@ if ($id > 0) {
     <div class="nav-links">
         <a href="javascript:history.back()"><i class="fas fa-arrow-left"></i> Back</a>
         <a href="dashboard.php">🏠 Dashboard</a>
-        <a href="prescriptiondashboard.php">📝 Prescriptions</a>
+        <a href="prescriptionDashboard.php">📝 Prescriptions</a>
     </div>
 </header>
 
@@ -229,7 +229,7 @@ if ($id > 0) {
             </div>
 
             <div class="actions no-print">
-                <a href="prescriptiondashboard.php" class="btn btn-back">⬅ Back to List</a>
+                <a href="prescriptionDashboard.php" class="btn btn-back">⬅ Back to List</a>
                 <button onclick="window.print()" class="btn btn-print"><i class="fas fa-print"></i> Print Record</button>
             </div>
 
@@ -238,7 +238,7 @@ if ($id > 0) {
                 <i class="fas fa-exclamation-triangle" style="font-size: 4em; color: #f39c12; margin-bottom: 20px;"></i>
                 <h2>Prescription Not Found</h2>
                 <p>The record #<?php echo $id; ?> could not be located in the <?php echo $source; ?> database.</p>
-                <a href="prescriptiondashboard.php" class="btn btn-back" style="display:inline-block; margin-top:20px;">Return to List</a>
+                <a href="prescriptionDashboard.php" class="btn btn-back" style="display:inline-block; margin-top:20px;">Return to List</a>
             </div>
         <?php endif; ?>
     </div>
