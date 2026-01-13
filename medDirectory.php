@@ -190,6 +190,10 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
         <div>Welcome, <strong><?php echo htmlspecialchars($username); ?></strong></div>
         <div class="nav-links">
             <a href="dashboard.php">🏠 Dashboard</a>
+            <a href="user_management.php" class="active">👤 User Management</a>
+            <a href="Sales_Billing.php" class="nav-btn">💰 Billing</a>
+            <a href="reports.php" class="nav-btn">📊 Report</a>
+            <a href="prescriptionDashboard.php" class="nav-btn">📈 Prescription</a>
             <a href="logout.php" style="border:1px solid white; padding:5px 10px; border-radius:5px;">Log Out</a>
         </div>
     </header>
