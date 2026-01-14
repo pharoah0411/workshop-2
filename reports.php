@@ -237,24 +237,18 @@ if ($mysql_conn2) {
 }
 
 // ===========================
-// COMBINE DATA FOR CHARTS
+// COMBINE DATA FOR CHARTS AND REPORTS
 // ===========================
 
-// ===========================
-// MONTHLY SALES DATA (31 days)
-// ===========================
-$currentMonth = date('n'); // Current month (1-12)
-$currentYear = date('Y'); // Current year
+// Monthly sales data
+$currentMonth = date('n');
+$currentYear = date('Y');
 $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $currentMonth, $currentYear);
-
-// Initialize array for all days of the month
 $monthlySalesData = array_fill(1, $daysInMonth, 0);
 
-// Combine sales data from all databases for the CURRENT MONTH
 foreach (['sqlsrv', 'pgsql', 'mysql'] as $dbType) {
     if (isset($db_results[$dbType]['data']['sales_days'])) {
         foreach ($db_results[$dbType]['data']['sales_days'] as $sale) {
-            // Only use data from current month
             if (isset($sale['day']) && is_numeric($sale['day']) && $sale['day'] >= 1 && $sale['day'] <= $daysInMonth) {
                 $day = (int)$sale['day'];
                 $total = floatval($sale['total']);
@@ -264,7 +258,7 @@ foreach (['sqlsrv', 'pgsql', 'mysql'] as $dbType) {
     }
 }
 
-// Create labels for all days of the month (1 January, 2 January...)
+// Create labels for all days of the month
 $salesDays = [];
 $salesTotals = [];
 $monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -332,6 +326,640 @@ $connectedDbs = 0;
 $connectedDbs += $db_results['sqlsrv']['connected'] ? 1 : 0;
 $connectedDbs += $db_results['pgsql']['connected'] ? 1 : 0;
 $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
+
+// ===========================
+// EXPORT FUNCTIONALITY
+// ===========================
+if (isset($_POST['export_pdf'])) {
+    // Show printable PDF version
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Pharmacy Analytics Report - PDF</title>
+        <style>
+            @media print {
+                @page {
+                    size: A4;
+                    margin: 20mm;
+                }
+                body {
+                    font-family: Arial, sans-serif;
+                    font-size: 12pt;
+                    line-height: 1.5;
+                    color: #000;
+                }
+                .no-print {
+                    display: none !important;
+                }
+                .break-before {
+                    page-break-before: always;
+                }
+                .break-after {
+                    page-break-after: avoid;
+                }
+                .no-break {
+                    page-break-inside: avoid;
+                }
+            }
+            
+            body {
+                font-family: Arial, sans-serif;
+                font-size: 12pt;
+                line-height: 1.5;
+                color: #000;
+                margin: 0;
+                padding: 20px;
+                max-width: 1000px;
+                margin: 0 auto;
+                background: white;
+            }
+            
+            .print-header {
+                text-align: center;
+                border-bottom: 3px solid #1c4966;
+                padding-bottom: 20px;
+                margin-bottom: 30px;
+            }
+            
+            .company-name {
+                font-size: 28pt;
+                font-weight: bold;
+                color: #1c4966;
+                margin-bottom: 10px;
+            }
+            
+            .report-title {
+                font-size: 20pt;
+                font-weight: bold;
+                color: #2a5d7a;
+                margin-bottom: 10px;
+            }
+            
+            .report-subtitle {
+                font-size: 14pt;
+                color: #666;
+                margin-bottom: 5px;
+            }
+            
+            .report-info {
+                font-size: 11pt;
+                color: #888;
+                margin-top: 10px;
+            }
+            
+            .section {
+                margin: 25px 0;
+                page-break-inside: avoid;
+            }
+            
+            .section-title {
+                font-size: 16pt;
+                font-weight: bold;
+                color: #1c4966;
+                border-bottom: 2px solid #1c4966;
+                padding-bottom: 8px;
+                margin-bottom: 15px;
+                page-break-after: avoid;
+            }
+            
+            .stat-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 15px;
+                margin: 20px 0;
+            }
+            
+            .stat-card {
+                border: 1px solid #ddd;
+                padding: 15px;
+                border-radius: 5px;
+                text-align: center;
+                background: #f8fafc;
+                page-break-inside: avoid;
+            }
+            
+            .stat-number {
+                font-size: 24pt;
+                font-weight: bold;
+                color: #1c4966;
+                margin: 10px 0;
+            }
+            
+            .stat-label {
+                font-size: 11pt;
+                color: #666;
+                font-weight: bold;
+            }
+            
+            .stat-subtext {
+                font-size: 10pt;
+                color: #888;
+                margin-top: 5px;
+            }
+            
+            .data-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 15px 0;
+                page-break-inside: avoid;
+            }
+            
+            .data-table th {
+                background-color: #1c4966;
+                color: white;
+                font-weight: bold;
+                padding: 12px;
+                text-align: left;
+                border: 1px solid #ddd;
+            }
+            
+            .data-table td {
+                padding: 10px;
+                border: 1px solid #ddd;
+            }
+            
+            .data-table tr:nth-child(even) {
+                background-color: #f8fafc;
+            }
+            
+            .data-table .total-row {
+                background-color: #e3f2fd;
+                font-weight: bold;
+            }
+            
+            .highlight {
+                background-color: #fff3cd !important;
+            }
+            
+            .warning {
+                background-color: #f8d7da !important;
+            }
+            
+            .db-status {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 15px;
+                margin: 20px 0;
+            }
+            
+            .db-card {
+                border: 2px solid;
+                padding: 15px;
+                border-radius: 5px;
+                text-align: center;
+            }
+            
+            .db-connected {
+                border-color: #5cb85c;
+                background-color: rgba(92, 184, 92, 0.1);
+            }
+            
+            .db-disconnected {
+                border-color: #8a8a8a;
+                background-color: rgba(138, 138, 138, 0.1);
+                opacity: 0.7;
+            }
+            
+            .db-name {
+                font-weight: bold;
+                font-size: 14pt;
+                margin-bottom: 10px;
+            }
+            
+            .db-text {
+                font-size: 11pt;
+                color: #666;
+            }
+            
+            .print-actions {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 1000;
+                background: white;
+                padding: 15px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                border: 2px solid #1c4966;
+            }
+            
+            .print-btn {
+                background: #1c4966;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 5px;
+                font-size: 14pt;
+                font-weight: bold;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 10px;
+            }
+            
+            .back-btn {
+                background: #8a8a8a;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                font-size: 12pt;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .footer {
+                margin-top: 50px;
+                padding-top: 20px;
+                border-top: 1px solid #ddd;
+                font-size: 10pt;
+                color: #888;
+                text-align: center;
+                page-break-before: always;
+            }
+            
+            .page-break {
+                page-break-before: always;
+                margin-top: 50px;
+            }
+        </style>
+    </head>
+    <body>
+        <!-- Print Actions -->
+        <div class="print-actions no-print">
+            <button onclick="window.print()" class="print-btn">
+                🖨️ Print / Save as PDF
+            </button>
+            <button onclick="window.history.back()" class="back-btn">
+                ← Back to Reports
+            </button>
+        </div>
+        
+        <!-- Report Header -->
+        <div class="print-header">
+            <div class="company-name">PHARMACY SYSTEM</div>
+            <div class="report-title">Analytics Report</div>
+            <div class="report-subtitle">Professional Healthcare Management</div>
+            <div class="report-info">
+                Generated on: <?php echo date('F j, Y, g:i a'); ?><br>
+                Report Period: <?php echo $currentMonthName . ' ' . $currentYear; ?><br>
+                Generated by: <?php echo htmlspecialchars($username); ?> (<?php echo htmlspecialchars($userRole); ?>)
+            </div>
+        </div>
+        
+        <!-- Database Status -->
+        <div class="section">
+            <div class="section-title">Database Connection Status</div>
+            <div class="db-status">
+                <div class="db-card <?php echo $db_results['sqlsrv']['connected'] ? 'db-connected' : 'db-disconnected'; ?>">
+                    <div class="db-name">SQL Server</div>
+                    <div class="db-text">
+                        <?php echo $db_results['sqlsrv']['connected'] ? 'Connected ✓' : 'Not Connected ✗'; ?>
+                        <?php if ($db_results['sqlsrv']['connected'] && isset($db_results['sqlsrv']['data']['users'])): ?>
+                        <div style="margin-top: 5px;">
+                            Users: <?php echo $db_results['sqlsrv']['data']['users']; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <div class="db-card <?php echo $db_results['pgsql']['connected'] ? 'db-connected' : 'db-disconnected'; ?>">
+                    <div class="db-name">PostgreSQL</div>
+                    <div class="db-text">
+                        <?php echo $db_results['pgsql']['connected'] ? 'Connected ✓' : 'Not Connected ✗'; ?>
+                        <?php if ($db_results['pgsql']['connected'] && isset($db_results['pgsql']['data']['users'])): ?>
+                        <div style="margin-top: 5px;">
+                            Users: <?php echo $db_results['pgsql']['data']['users']; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <div class="db-card <?php echo $db_results['mysql']['connected'] ? 'db-connected' : 'db-disconnected'; ?>">
+                    <div class="db-name">MySQL</div>
+                    <div class="db-text">
+                        <?php echo $db_results['mysql']['connected'] ? 'Connected ✓' : 'Not Connected ✗'; ?>
+                        <?php if ($db_results['mysql']['connected'] && isset($db_results['mysql']['data']['users'])): ?>
+                        <div style="margin-top: 5px;">
+                            Users: <?php echo $db_results['mysql']['data']['users']; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 15px; font-style: italic; color: #666;">
+                Connected Databases: <?php echo $connectedDbs; ?>/3
+            </div>
+        </div>
+        
+        <!-- Summary Statistics -->
+        <div class="section">
+            <div class="section-title">Summary Statistics (Combined from all databases)</div>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-number"><?php echo $totalUsers; ?></div>
+                    <div class="stat-label">Total Users</div>
+                    <div class="stat-subtext">All databases combined</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number"><?php echo $totalPatients; ?></div>
+                    <div class="stat-label">Total Patients</div>
+                    <div class="stat-subtext">All databases combined</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number"><?php echo $totalPrescriptions; ?></div>
+                    <div class="stat-label">Total Prescriptions</div>
+                    <div class="stat-subtext">All databases combined</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number"><?php echo $lowStock; ?></div>
+                    <div class="stat-label">Low Stock Items</div>
+                    <div class="stat-subtext">Quantity < 20</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number">RM <?php echo number_format($todaysSales, 2); ?></div>
+                    <div class="stat-label">Today's Sales</div>
+                    <div class="stat-subtext">All databases combined</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-number">RM <?php echo number_format($monthlySales, 2); ?></div>
+                    <div class="stat-label">Monthly Sales</div>
+                    <div class="stat-subtext">All databases combined</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Top Medicines -->
+        <div class="section">
+            <div class="section-title">Top 5 Prescribed Medicines</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 70%;">Medicine Name</th>
+                        <th style="width: 30%;">Times Prescribed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php for ($i = 0; $i < count($medNames); $i++): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($medNames[$i]); ?></td>
+                        <td><?php echo $medCounts[$i]; ?></td>
+                    </tr>
+                    <?php endfor; ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Stock Status -->
+        <div class="section">
+            <div class="section-title">Lowest Stock Medicines (Need Reorder)</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 70%;">Medicine Name</th>
+                        <th style="width: 30%;">Current Stock</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php for ($i = 0; $i < count($stockNames); $i++): ?>
+                    <tr class="<?php echo $stockQty[$i] < 20 ? 'warning' : ''; ?>">
+                        <td><?php echo htmlspecialchars($stockNames[$i]); ?></td>
+                        <td><?php echo $stockQty[$i]; ?></td>
+                    </tr>
+                    <?php endfor; ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Daily Sales Table -->
+        <div class="section page-break">
+            <div class="section-title">Daily Sales for <?php echo $currentMonthName . ' ' . $currentYear; ?></div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Date</th>
+                        <th style="width: 35%;">Day of Week</th>
+                        <th style="width: 35%;">Sales (RM)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    $totalMonthly = 0;
+                    for ($day = 1; $day <= $daysInMonth; $day++): 
+                        $sales = $monthlySalesData[$day];
+                        $totalMonthly += $sales;
+                        $dateString = $currentMonthName . ' ' . $day . ', ' . $currentYear;
+                        $dayOfWeek = date('l', strtotime($currentYear . '-' . $currentMonth . '-' . $day));
+                    ?>
+                    <tr>
+                        <td><?php echo $day . ' ' . $currentMonthName; ?></td>
+                        <td><?php echo $dayOfWeek; ?></td>
+                        <td><?php echo ($sales > 0 ? 'RM ' . number_format($sales, 2) : '-'); ?></td>
+                    </tr>
+                    <?php endfor; ?>
+                    
+                    <tr class="total-row">
+                        <td colspan="2"><strong>Total Monthly Sales:</strong></td>
+                        <td><strong>RM <?php echo number_format($totalMonthly, 2); ?></strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div>Report ID: PHARM-<?php echo date('Ymd-His'); ?></div>
+            <div>© <?php echo date('Y'); ?> Pharmacy System. All rights reserved.</div>
+            <div>This report is generated automatically and should be considered confidential.</div>
+        </div>
+        
+        <script>
+            // Auto-print option
+            window.onload = function() {
+                // Auto-print after 1 second
+                setTimeout(function() {
+                    window.print();
+                }, 1000);
+            };
+            
+            // Listen for print completion
+            window.onafterprint = function() {
+                // Optionally go back after printing
+                // window.history.back();
+            };
+        </script>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+if (isset($_POST['export_excel'])) {
+    // Set headers for Excel download
+    header('Content-Type: application/vnd.ms-excel');
+    header('Content-Disposition: attachment;filename="Pharmacy_Report_' . date('Y_m_d') . '.xls"');
+    header('Cache-Control: max-age=0');
+    
+    // Start output
+    echo '<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body { font-family: Arial, sans-serif; }
+            .header { background-color: #1c4966; color: white; font-weight: bold; padding: 10px; }
+            .title { font-size: 18px; font-weight: bold; margin: 10px 0; }
+            .subtitle { font-size: 14px; color: #666; margin-bottom: 15px; }
+            .section { margin: 20px 0; border: 1px solid #ddd; }
+            .section-title { background-color: #f2f2f2; font-weight: bold; padding: 8px; border-bottom: 1px solid #ddd; }
+            .data-table { width: 100%; border-collapse: collapse; }
+            .data-table th { background-color: #2a5d7a; color: white; font-weight: bold; padding: 8px; border: 1px solid #ddd; }
+            .data-table td { padding: 8px; border: 1px solid #ddd; }
+            .stat-box { background-color: #e3f2fd; padding: 10px; margin: 10px 0; border-left: 4px solid #1c4966; }
+            .highlight { background-color: #fff3cd; }
+            .total-row { font-weight: bold; background-color: #f8f9fa; }
+        </style>
+    </head>
+    <body>';
+    
+    // Report Header
+    echo '<div class="title" style="text-align: center;">Pharmacy Analytics Report</div>';
+    echo '<div class="subtitle" style="text-align: center;">Generated on: ' . date('F j, Y, g:i a') . '</div>';
+    echo '<div class="subtitle" style="text-align: center;">Report Period: ' . $currentMonthName . ' ' . $currentYear . '</div>';
+    
+    // Database Connection Status
+    echo '<div class="section">';
+    echo '<div class="section-title">Database Connection Status</div>';
+    echo '<div class="stat-box">';
+    echo '<strong>Connected Databases:</strong> ' . $connectedDbs . '/3<br>';
+    echo '<strong>SQL Server:</strong> ' . ($db_results['sqlsrv']['connected'] ? 'Connected' : 'Disconnected') . '<br>';
+    echo '<strong>PostgreSQL:</strong> ' . ($db_results['pgsql']['connected'] ? 'Connected' : 'Disconnected') . '<br>';
+    echo '<strong>MySQL:</strong> ' . ($db_results['mysql']['connected'] ? 'Connected' : 'Disconnected');
+    echo '</div>';
+    echo '</div>';
+    
+    // Summary Statistics
+    echo '<div class="section">';
+    echo '<div class="section-title">Summary Statistics (Combined from all databases)</div>';
+    echo '<table class="data-table">';
+    echo '<tr>
+            <th style="width: 60%;">Metric</th>
+            <th style="width: 40%;">Value</th>
+          </tr>';
+    echo '<tr>
+            <td>Total Users</td>
+            <td>' . $totalUsers . '</td>
+          </tr>';
+    echo '<tr>
+            <td>Total Patients</td>
+            <td>' . $totalPatients . '</td>
+          </tr>';
+    echo '<tr>
+            <td>Total Prescriptions</td>
+            <td>' . $totalPrescriptions . '</td>
+          </tr>';
+    echo '<tr>
+            <td>Low Stock Items</td>
+            <td>' . $lowStock . '</td>
+          </tr>';
+    echo '<tr>
+            <td>Today\'s Sales</td>
+            <td>RM ' . number_format($todaysSales, 2) . '</td>
+          </tr>';
+    echo '<tr class="total-row">
+            <td>Monthly Sales</td>
+            <td>RM ' . number_format($monthlySales, 2) . '</td>
+          </tr>';
+    echo '</table>';
+    echo '</div>';
+    
+    // Top Medicines
+    echo '<div class="section">';
+    echo '<div class="section-title">Top 5 Prescribed Medicines</div>';
+    echo '<table class="data-table">';
+    echo '<tr>
+            <th style="width: 70%;">Medicine Name</th>
+            <th style="width: 30%;">Times Prescribed</th>
+          </tr>';
+    for ($i = 0; $i < count($medNames); $i++) {
+        echo '<tr>
+                <td>' . htmlspecialchars($medNames[$i]) . '</td>
+                <td>' . $medCounts[$i] . '</td>
+              </tr>';
+    }
+    echo '</table>';
+    echo '</div>';
+    
+    // Stock Status
+    echo '<div class="section">';
+    echo '<div class="section-title">Lowest Stock Medicines (Need Reorder)</div>';
+    echo '<table class="data-table">';
+    echo '<tr>
+            <th style="width: 70%;">Medicine Name</th>
+            <th style="width: 30%;">Current Stock</th>
+          </tr>';
+    for ($i = 0; $i < count($stockNames); $i++) {
+        $rowClass = $stockQty[$i] < 20 ? 'class="highlight"' : '';
+        echo '<tr ' . $rowClass . '>
+                <td>' . htmlspecialchars($stockNames[$i]) . '</td>
+                <td>' . $stockQty[$i] . '</td>
+              </tr>';
+    }
+    echo '</table>';
+    echo '</div>';
+    
+    // Daily Sales Table
+    echo '<div class="section">';
+    echo '<div class="section-title">Daily Sales for ' . $currentMonthName . ' ' . $currentYear . '</div>';
+    echo '<table class="data-table">';
+    echo '<tr>
+            <th style="width: 30%;">Date</th>
+            <th style="width: 35%;">Day of Week</th>
+            <th style="width: 35%;">Sales (RM)</th>
+          </tr>';
+    
+    $totalMonthly = 0;
+    for ($day = 1; $day <= $daysInMonth; $day++) {
+        $sales = $monthlySalesData[$day];
+        $totalMonthly += $sales;
+        $dateString = $currentMonthName . ' ' . $day . ', ' . $currentYear;
+        $dayOfWeek = date('l', strtotime($currentYear . '-' . $currentMonth . '-' . $day));
+        
+        echo '<tr>
+                <td>' . $day . ' ' . $currentMonthName . '</td>
+                <td>' . $dayOfWeek . '</td>
+                <td>' . ($sales > 0 ? 'RM ' . number_format($sales, 2) : '-') . '</td>
+              </tr>';
+    }
+    
+    echo '<tr class="total-row">
+            <td colspan="2"><strong>Total Monthly Sales:</strong></td>
+            <td><strong>RM ' . number_format($totalMonthly, 2) . '</strong></td>
+          </tr>';
+    echo '</table>';
+    echo '</div>';
+    
+    // Footer
+    echo '<div style="margin-top: 30px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 11px; color: #666;">
+            Report generated by: ' . htmlspecialchars($username) . '<br>
+            User Role: ' . htmlspecialchars($userRole) . '<br>
+            Generated on: ' . date('Y-m-d H:i:s') . '
+          </div>';
+    
+    echo '</body></html>';
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -417,7 +1045,7 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
             color: white;
             margin-bottom: 6px;
             display: flex;
-            align-items: center;
+                align-items: center;
             justify-content: center;
             gap: 8px;
         }
@@ -587,6 +1215,49 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
             display: flex;
             align-items: center;
             gap: 15px;
+        }
+
+        /* Export Buttons Container */
+        .export-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Export Button Styles */
+        .export-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .export-pdf {
+            background: linear-gradient(135deg, #d9534f, #c9302c);
+            color: white;
+        }
+
+        .export-pdf:hover {
+            background: linear-gradient(135deg, #c9302c, #ac2925);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(217, 83, 79, 0.3);
+        }
+
+        .export-excel {
+            background: linear-gradient(135deg, #5cb85c, #449d44);
+            color: white;
+        }
+
+        .export-excel:hover {
+            background: linear-gradient(135deg, #449d44, #398439);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(92, 184, 92, 0.3);
         }
 
         .search-box {
@@ -816,14 +1487,13 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
             font-weight: 300;
         }
 
-        /* Error Message */
-        .error-message {
-            background-color: #fee;
-            color: var(--alert-red);
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            border-left: 5px solid var(--alert-red);
+        /* Export Notice */
+        .export-notice {
+            background: var(--blue-light);
+            border-left: 4px solid var(--blue-accent);
+            padding: 15px 20px;
+            margin-top: 20px;
+            border-radius: 8px;
             font-size: 0.9em;
         }
 
@@ -879,6 +1549,13 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
             
             .header-actions {
                 width: 100%;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .export-container {
+                width: 100%;
+                justify-content: flex-start;
             }
             
             .stats-grid {
@@ -933,6 +1610,11 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
             
             .chart-wrapper {
                 height: 250px;
+            }
+            
+            .export-btn {
+                width: 100%;
+                justify-content: center;
             }
         }
     </style>
@@ -990,6 +1672,20 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
                     <p>Pharmacy Performance Dashboard - <?php echo date('l, F j, Y'); ?></p>
                 </div>
                 <div class="header-actions">
+                    <!-- Export Buttons -->
+                    <div class="export-container">
+                        <form method="POST" style="margin: 0;">
+                            <button type="submit" name="export_pdf" class="export-btn export-pdf">
+                                <i class="fas fa-file-pdf"></i> Export PDF
+                            </button>
+                        </form>
+                        <form method="POST" style="margin: 0;">
+                            <button type="submit" name="export_excel" class="export-btn export-excel">
+                                <i class="fas fa-file-excel"></i> Export Excel
+                            </button>
+                        </form>
+                    </div>
+                    
                     <div class="search-box">
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" placeholder="Search reports...">
@@ -1073,7 +1769,7 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
                     </div>
                 </div>
 
-                <!-- Charts Section (NOW AT THE TOP) -->
+                <!-- Charts Section -->
                 <section class="charts-section">
                     <h2 class="section-title"><i class="fas fa-chart-bar"></i> Combined Analytics from All Databases</h2>
                     
@@ -1104,7 +1800,7 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
                     </div>
                 </section>
 
-                <!-- Statistics Cards (MOVED TO BOTTOM) -->
+                <!-- Statistics Cards -->
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-icon"><i class="fas fa-users"></i></div>
@@ -1148,6 +1844,13 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
                         <div class="stat-subtext">Summed from all databases</div>
                     </div>
                 </div>
+
+                <!-- Export Notice -->
+                <div class="export-notice">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Professional Reports Available:</strong> Export complete analytics as PDF or Excel format. 
+                    PDF reports include detailed tables and formatting. Excel exports include color-coded data for easy analysis.
+                </div>
             </div>
         </main>
     </div>
@@ -1176,20 +1879,19 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
         });
 
         // VIBRANT COLOR CHARTS
-        // Sales Chart with colorful gradient - NOW SHOWS FULL MONTH DATES
+        // Sales Chart with colorful gradient
         const salesCtx = document.getElementById('salesChart').getContext('2d');
         const gradient = salesCtx.createLinearGradient(0, 0, 0, 400);
-        gradient.addColorStop(0, 'rgba(76, 175, 80, 0.8)');   // Bright Green
-        gradient.addColorStop(0.5, 'rgba(33, 150, 243, 0.6)'); // Bright Blue
+        gradient.addColorStop(0, 'rgba(76, 175, 80, 0.8)');
+        gradient.addColorStop(0.5, 'rgba(33, 150, 243, 0.6)');
         gradient.addColorStop(1, 'rgba(76, 175, 80, 0.1)');
         
         // Truncate long labels for better display
         const salesLabels = <?php echo json_encode($salesDays); ?>;
         const truncatedLabels = salesLabels.map(label => {
-            // Show shorter version for crowded displays
             if (salesLabels.length > 15) {
                 const parts = label.split(' ');
-                return parts[0]; // Just show day number
+                return parts[0];
             }
             return label;
         });
@@ -1201,12 +1903,12 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
                 datasets: [{
                     label: 'Combined Sales (RM)',
                     data: <?php echo json_encode($salesTotals); ?>,
-                    borderColor: '#4CAF50', // Bright Green
+                    borderColor: '#4CAF50',
                     backgroundColor: gradient,
                     borderWidth: 4,
                     fill: true,
                     tension: 0.4,
-                    pointBackgroundColor: '#2196F3', // Blue points
+                    pointBackgroundColor: '#2196F3',
                     pointBorderColor: '#fff',
                     pointBorderWidth: 3,
                     pointRadius: salesLabels.length > 15 ? 3 : 6,
@@ -1264,16 +1966,16 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
                     label: 'Times Prescribed',
                     data: <?php echo json_encode($medCounts); ?>,
                     backgroundColor: [
-                        '#FF5252', // Red
-                        '#FF4081', // Pink
-                        '#E040FB', // Purple
-                        '#7C4DFF', // Deep Purple
-                        '#536DFE', // Indigo
-                        '#448AFF', // Blue
-                        '#40C4FF', // Light Blue
-                        '#18FFFF', // Cyan
-                        '#64FFDA', // Teal
-                        '#69F0AE'  // Green
+                        '#FF5252',
+                        '#FF4081',
+                        '#E040FB',
+                        '#7C4DFF',
+                        '#536DFE',
+                        '#448AFF',
+                        '#40C4FF',
+                        '#18FFFF',
+                        '#64FFDA',
+                        '#69F0AE'
                     ],
                     borderColor: '#1c4966',
                     borderWidth: 2
@@ -1312,16 +2014,16 @@ $connectedDbs += $db_results['mysql']['connected'] ? 1 : 0;
                 datasets: [{
                     data: <?php echo json_encode($stockQty); ?>,
                     backgroundColor: [
-                        '#FF5252', // Red
-                        '#FF9800', // Orange
-                        '#FFEB3B', // Yellow
-                        '#4CAF50', // Green
-                        '#2196F3', // Blue
-                        '#9C27B0', // Purple
-                        '#E91E63', // Pink
-                        '#00BCD4', // Cyan
-                        '#8BC34A', // Light Green
-                        '#FF5722'  // Deep Orange
+                        '#FF5252',
+                        '#FF9800',
+                        '#FFEB3B',
+                        '#4CAF50',
+                        '#2196F3',
+                        '#9C27B0',
+                        '#E91E63',
+                        '#00BCD4',
+                        '#8BC34A',
+                        '#FF5722'
                     ],
                     borderWidth: 3,
                     borderColor: '#fff'
