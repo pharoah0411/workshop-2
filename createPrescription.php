@@ -94,8 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_presc'])) {
                 }
 
                 if (!$sqlPharmacistId) {
-                    $role = $_SESSION['role'] ?? 'Pharmacist';
-                    $tempPass = 'SyncPassword123!'; 
+                $role = $_SESSION['role'] ?? 'Pharmacist';
+                $tempPass = password_hash('SyncPassword123!', PASSWORD_DEFAULT); 
                     if ($target_source === 'MySQL') {
                         $insP = $target_conn->prepare("INSERT INTO `USER` (USERNAME, PASSWORD, ROLE) VALUES (?, ?, ?)");
                         $insP->bind_param("sss", $username, $tempPass, $role); $insP->execute();
@@ -158,8 +158,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_presc'])) {
                     $target_conn->beginTransaction();
                     $date_func = ($target_source === 'Postgres') ? "CURRENT_TIMESTAMP" : "GETDATE()";
                     $insH = $target_conn->prepare("INSERT INTO PRESCRIPTION (PATIENT_ID, PHARMACIST_ID, DATE_ISSUED, STATUS) VALUES (?, ?, $date_func, 'Pending')");
-                    // Insert the current username string for PostgreSQL and SQL Server as requested
-                    $insH->execute([$sqlPatientId, $username]);
+                    // Modified to insert the synced pharmacist user ID for PostgreSQL and SQL Server
+                    $insH->execute([$sqlPatientId, $sqlPharmacistId]);
                     $lastId = $target_conn->lastInsertId();
 
                     foreach ($sourceItems as $item) {

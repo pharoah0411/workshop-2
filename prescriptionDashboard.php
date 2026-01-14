@@ -1016,10 +1016,6 @@ usort($prescriptions, function($a, $b) {
             <i class="fas fa-plus"></i> New Prescription (Pharmacist Only)
         </a>
     <?php endif; ?>
-    
-    <a href="export_prescription.php" class="btn-secondary">
-        <i class="fas fa-file-export"></i> Export Prescriptions
-    </a>
 </div>
 
                 <!-- Search and Filter -->

@@ -115,8 +115,14 @@ $items = [];
 $medicines = [];
 
 try {
-    // 1. Fetch Header
-    $sqlH = "SELECT pr.STATUS, pr.DATE_ISSUED, p.NAME AS PATIENT_NAME FROM PRESCRIPTION pr JOIN PATIENT p ON pr.PATIENT_ID = p.PATIENT_ID WHERE pr.PRESCRIPTION_ID = ?";
+    // 1. Fetch Header with Pharmacist Info
+    $userTable = ($source === 'MySQL') ? "`USER`" : (($source === 'SQLServer') ? "[USER]" : "\"user\"");
+    $sqlH = "SELECT pr.PHARMACIST_ID, u.USERNAME AS PHARMACIST_NAME, pr.STATUS, pr.DATE_ISSUED, p.NAME AS PATIENT_NAME 
+             FROM PRESCRIPTION pr 
+             JOIN PATIENT p ON pr.PATIENT_ID = p.PATIENT_ID 
+             JOIN $userTable u ON pr.PHARMACIST_ID = u.USER_ID
+             WHERE pr.PRESCRIPTION_ID = ?";
+             
     if ($source === 'MySQL') {
         $stmt = $conn->prepare($sqlH); $stmt->bind_param("i", $id); $stmt->execute();
         $pres = $stmt->get_result()->fetch_assoc();
@@ -125,6 +131,25 @@ try {
         $pres = $stmt->fetch(PDO::FETCH_ASSOC);
     }
     if ($pres) $pres = array_change_key_case($pres, CASE_UPPER);
+
+    // Permission Check: Compare session user's ID with stored PHARMACIST_ID
+    if ($pres) {
+        $currentUserId = 0;
+        $sqlCU = "SELECT USER_ID FROM $userTable WHERE USERNAME = ?";
+        if ($source === 'MySQL') {
+            $stU = $conn->prepare($sqlCU); $stU->bind_param("s", $username); $stU->execute();
+            $currentUserId = $stU->get_result()->fetch_assoc()['USER_ID'] ?? 0;
+        } else {
+            $stU = $conn->prepare($sqlCU); $stU->execute([$username]);
+            $currentUserId = $stU->fetchColumn() ?: 0;
+        }
+
+        if ($currentUserId != intval($pres['PHARMACIST_ID'])) {
+            $phName = $pres['PHARMACIST_NAME'] ?? 'another pharmacist';
+            echo "<script>alert('This patient handled by $phName. You are not allowed to edit.'); window.location.href='prescriptionDashboard.php';</script>";
+            exit;
+        }
+    }
 
     // 2. Fetch Global Medicine List with Source Tracking
     $sqlM = "SELECT MEDICINE_ID, NAME FROM MEDICINE ORDER BY NAME";
@@ -180,12 +205,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // 2. Create New Prescription Header in Target
             $dateIssued = $pres['DATE_ISSUED'] ?? date('Y-m-d');
-            $sqlH = "INSERT INTO PRESCRIPTION (PATIENT_ID, DATE_ISSUED, STATUS) VALUES (?, ?, ?)";
+            $sqlH = "INSERT INTO PRESCRIPTION (PATIENT_ID, PHARMACIST_ID, DATE_ISSUED, STATUS) VALUES (?, ?, ?, ?)";
             if ($targetSource === 'MySQL') {
-                $st = $targetConn->prepare($sqlH); $st->bind_param("iss", $newPatientId, $dateIssued, $status); $st->execute();
+                $st = $targetConn->prepare($sqlH); 
+                $st->bind_param("iiss", $newPatientId, $pres['PHARMACIST_ID'], $dateIssued, $status); 
+                $st->execute();
                 $newId = $targetConn->insert_id;
             } else {
-                $targetConn->prepare($sqlH)->execute([$newPatientId, $dateIssued, $status]);
+                $targetConn->prepare($sqlH)->execute([$newPatientId, $pres['PHARMACIST_ID'], $dateIssued, $status]);
                 $newId = $targetConn->lastInsertId();
             }
 
@@ -428,7 +455,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <div class="form-grid">
                                     <div>
                                         <label class="form-label">Medicine</label>
-                                        <select name="meds[<?= $idx ?>][med_name]" class="form-control" required>
+                                        <select name="meds[<?= $idx ?>][med_name]" class="form-control" disabled>
                                             <option value="">Select Medicine...</option>
                                             <?php foreach($medicines as $mKey => $m): ?>
                                             <option value="<?= htmlspecialchars($mKey) ?>" <?= ($item['MED_NAME'] == $m['NAME'] && $m['SOURCE'] == $source) ? 'selected' : '' ?>>
@@ -436,6 +463,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                             </option>
                                             <?php endforeach; ?>
                                         </select>
+                                        <input type="hidden" name="meds[<?= $idx ?>][med_name]" value="<?= htmlspecialchars($item['MED_NAME'] . '|' . $source) ?>">
                                     </div>
                                     <div>
                                         <label class="form-label">Dosage</label>
@@ -488,7 +516,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <?php endforeach; ?>
                         </div>
 
-                        <button type="button" onclick="addRow()" class="btn btn-add"><i class="fas fa-plus"></i> Add New Medication Item</button>
                         <div class="action-buttons">
                             <a href="prescriptionDashboard.php" class="btn btn-secondary"><i class="fas fa-times"></i> Cancel</a>
                             <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Save Changes</button>
