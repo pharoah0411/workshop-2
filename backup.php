@@ -1548,12 +1548,6 @@ foreach ($backup_files as $file) {
                     <h1>Backup & Restore</h1>
                     <p>Manage database backups and restorations - <?php echo date('l, F j, Y H:i:s'); ?></p>
                 </div>
-                <div class="header-actions">
-                    <div class="search-box">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" placeholder="Search backup files...">
-                    </div>
-                </div>
             </header>
 
             <div class="content-wrapper">
