@@ -53,11 +53,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         $stmt->bind_param("ss", $patient_name, $date_issued);
                         $stmt->execute();
                         $res = $stmt->get_result();
-                        while($row = $res->fetch_assoc()) $results[] = $row;
+                        // FIX: Added normalization to upper case keys
+                        while($row = $res->fetch_assoc()) $results[] = array_change_key_case($row, CASE_UPPER);
                     } else {
                         $stmt = $conn->prepare($q);
                         $stmt->execute([$patient_name, $date_issued]);
-                        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                        // FIX: Added normalization to upper case keys
+                        $raw_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                        foreach($raw_rows as $row) $results[] = array_change_key_case($row, CASE_UPPER);
                     }
 
                     foreach ($results as $row) {

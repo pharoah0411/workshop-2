@@ -1092,9 +1092,6 @@ usort($prescriptions, function($a, $b) {
         <input type="hidden" name="prescription_id" value="<?php echo $p['PRESCRIPTION_ID']; ?>">
         <input type="hidden" name="source" value="<?php echo $src; ?>">
         <input type="hidden" name="status" value="Completed">
-        <button type="submit" class="btn-done" onclick="return confirm('Mark prescription #<?php echo $p['PRESCRIPTION_ID']; ?> as Completed?')">
-            Done
-        </button>
     </form>
     <?php endif; ?>
 

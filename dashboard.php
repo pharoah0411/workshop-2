@@ -60,7 +60,8 @@ function getDbCountValue($conn, $query, $is_mysqli = false) {
 // 1. MySQL Data Collection
 if ($mysql_connected) {
     $stats['medicine_count'] += getDbCountValue($mysql_conn2, "SELECT COUNT(*) FROM MEDICINE", true);
-    $stats['low_stock_count'] += getDbCountValue($mysql_conn2, "SELECT COUNT(*) FROM MEDICINE WHERE quantity <= $low_stock_threshold", true);
+    // FIX: Corrected column name to QUANTITY_IN_STOCK
+    $stats['low_stock_count'] += getDbCountValue($mysql_conn2, "SELECT COUNT(*) FROM MEDICINE WHERE QUANTITY_IN_STOCK <= $low_stock_threshold", true);
     $stats['pending_prescriptions'] += getDbCountValue($mysql_conn2, "SELECT COUNT(*) FROM PRESCRIPTION WHERE LOWER(status) = 'pending' OR status IS NULL", true);
     
     // Collect IDs for deduplication
@@ -74,7 +75,8 @@ if ($mysql_connected) {
 // 2. PostgreSQL Data Collection
 if ($postgresql_connected) {
     $stats['medicine_count'] += getDbCountValue($pg_conn, "SELECT COUNT(*) FROM MEDICINE");
-    $stats['low_stock_count'] += getDbCountValue($pg_conn, "SELECT COUNT(*) FROM MEDICINE WHERE quantity <= $low_stock_threshold");
+    // FIX: Corrected column name to QUANTITY_IN_STOCK
+    $stats['low_stock_count'] += getDbCountValue($pg_conn, "SELECT COUNT(*) FROM MEDICINE WHERE QUANTITY_IN_STOCK <= $low_stock_threshold");
     $stats['pending_prescriptions'] += getDbCountValue($pg_conn, "SELECT COUNT(*) FROM PRESCRIPTION WHERE LOWER(status) = 'pending' OR status IS NULL");
     
     // Collect IDs for deduplication
@@ -88,7 +90,8 @@ if ($postgresql_connected) {
 // 3. SQL Server Data Collection
 if ($sqlserver_connected) {
     $stats['medicine_count'] += getDbCountValue($pdo, "SELECT COUNT(*) FROM MEDICINE");
-    $stats['low_stock_count'] += getDbCountValue($pdo, "SELECT COUNT(*) FROM MEDICINE WHERE quantity <= $low_stock_threshold");
+    // FIX: Corrected column name to QUANTITY_IN_STOCK
+    $stats['low_stock_count'] += getDbCountValue($pdo, "SELECT COUNT(*) FROM MEDICINE WHERE QUANTITY_IN_STOCK <= $low_stock_threshold");
     $stats['pending_prescriptions'] += getDbCountValue($pdo, "SELECT COUNT(*) FROM PRESCRIPTION WHERE LOWER(status) = 'pending' OR status IS NULL");
     
     // Collect IDs for deduplication
@@ -189,305 +192,48 @@ if ($postgresql_connected) $connected_dbs++;
         .pharmacy-logo h1 {
             font-size: 1.3em;
             font-weight: 600;
-            color: white;
-            margin-bottom: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
+            color: white; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; gap: 8px;
         }
 
-        .pharmacy-logo p {
-            font-size: 0.8em;
-            color: rgba(255, 255, 255, 0.85);
-            font-weight: 300;
-        }
-
-        .user-profile {
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-        }
-
-        .user-avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, white, var(--blue-light));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--dark-blue);
-            font-weight: 600;
-            font-size: 1.2em;
-            border: 2px solid white;
-        }
-
-        .user-info {
-            margin-left: 12px;
-        }
-
-        .user-name {
-            font-weight: 500;
-            font-size: 0.95em;
-            margin-bottom: 3px;
-        }
-
-        .user-role {
-            font-size: 0.8em;
-            color: rgba(255, 255, 255, 0.9);
-            background: rgba(255, 255, 255, 0.15);
-            padding: 3px 8px;
-            border-radius: 10px;
-            display: inline-block;
-        }
-
-        /* Navigation Menu */
-        .nav-menu {
-            flex: 1;
-            padding: 25px 0;
-            overflow-y: auto;
-        }
-
-        .nav-section {
-            margin-bottom: 25px;
-            padding: 0 20px;
-        }
-
-        .nav-title {
-            font-size: 0.75em;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: rgba(255, 255, 255, 0.7);
-            margin-bottom: 12px;
-            font-weight: 500;
-        }
-
-        .nav-links {
-            list-style: none;
-        }
-
-        .nav-links li {
-            margin-bottom: 6px;
-        }
-
-        .nav-links a {
-            display: flex;
-            align-items: center;
-            color: rgba(255, 255, 255, 0.9);
-            text-decoration: none;
-            padding: 10px 12px;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-            border-left: 2px solid transparent;
-            font-size: 0.9em;
-        }
-
-        .nav-links a:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border-left-color: var(--blue-accent);
-        }
-
-        .nav-links a.active {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            border-left-color: white;
-            font-weight: 500;
-        }
-
-        .nav-icon {
-            width: 20px;
-            text-align: center;
-            margin-right: 10px;
-            font-size: 1em;
-        }
-
-        .logout-btn {
-            margin: 15px 20px 0;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 8px;
-            font-size: 0.9em;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .logout-btn:hover {
-            background: var(--alert-red);
-            border-color: var(--alert-red);
-            transform: translateY(-1px);
-        }
-
-        /* Main Content Area */
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        /* Header */
-        .main-header {
-            padding: 20px 35px;
-            background: white;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header-title h1 {
-            font-size: 1.4em;
-            color: var(--dark-blue);
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .header-title p {
-            color: var(--text-secondary);
-            font-size: 0.9em;
-            font-weight: 300;
-        }
-
-        /* Content Area */
-        .content-wrapper {
-            flex: 1;
-            padding: 30px;
-            overflow-y: auto;
-            background: var(--main-bg);
-        }
-
-        /* Welcome Section */
-        .welcome-section {
-            background: linear-gradient(135deg, var(--dark-blue), var(--blue-medium));
-            color: white;
-            padding: 30px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-        }
-
-        .welcome-text h2 {
-            font-size: 1.5em;
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-
-        .welcome-text p {
-            font-size: 0.95em;
-            opacity: 0.9;
-            font-weight: 300;
-        }
-
-        /* System Status Grid */
-        .status-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-
-        .status-card {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
-            border: 1px solid var(--border-color);
-        }
-
-        .status-icon {
-            font-size: 2em;
-            margin-bottom: 12px;
-        }
-
-        .status-title {
-            font-size: 1em;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 6px;
-        }
-
-        .status-description {
-            color: var(--text-secondary);
-            font-size: 0.85em;
-            margin-bottom: 10px;
-        }
-
-        .status-time {
-            font-size: 0.8em;
-            color: var(--dark-blue);
-            font-weight: 500;
-        }
-
-        /* Quick Stats */
-        .quick-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 18px;
-            border-radius: 10px;
-            text-align: center;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
-        }
-
-        .stat-number {
-            font-size: 1.8em;
-            font-weight: 700;
-            color: var(--dark-blue);
-            margin: 8px 0;
-        }
-
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 0.85em;
-            font-weight: 300;
-        }
-
-        /* System Status Section */
-        .system-status-section {
-            margin-bottom: 30px;
-        }
-
-        .section-title {
-            font-size: 1.2em;
-            color: var(--dark-blue);
-            margin-bottom: 15px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        /* Responsive Design */
-        @media (max-width: 1200px) {
-            .dashboard-container { height: auto; flex-direction: column; }
-            .sidebar { width: 100%; height: auto; }
-            .nav-menu { display: flex; flex-wrap: wrap; gap: 10px; padding: 15px; }
-            .nav-section { flex: 1; min-width: 200px; margin-bottom: 15px; }
-            .main-content { width: 100%; }
-        }
-
-        @media (max-width: 768px) {
-            .content-wrapper { padding: 20px; }
-            .main-header { padding: 15px 20px; flex-direction: column; align-items: flex-start; gap: 15px; }
-            .status-grid, .quick-stats { grid-template-columns: 1fr; }
-            .welcome-section { padding: 20px; }
-        }
+        .pharmacy-logo p { font-size: 0.8em; color: rgba(255, 255, 255, 0.85); font-weight: 300; }
+        .user-profile { padding: 20px; display: flex; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.15); }
+        .user-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, white, var(--blue-light)); display: flex; align-items: center; justify-content: center; color: var(--dark-blue); font-weight: 600; font-size: 1.2em; border: 2px solid white; }
+        .user-info { margin-left: 12px; }
+        .user-name { font-weight: 500; font-size: 0.95em; margin-bottom: 3px; }
+        .user-role { font-size: 0.8em; color: rgba(255, 255, 255, 0.9); background: rgba(255, 255, 255, 0.15); padding: 3px 8px; border-radius: 10px; display: inline-block; }
+        .nav-menu { flex: 1; padding: 25px 0; overflow-y: auto; }
+        .nav-section { margin-bottom: 25px; padding: 0 20px; }
+        .nav-title { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255, 255, 255, 0.7); margin-bottom: 12px; font-weight: 500; }
+        .nav-links { list-style: none; }
+        .nav-links li { margin-bottom: 6px; }
+        .nav-links a { display: flex; align-items: center; color: rgba(255, 255, 255, 0.9); text-decoration: none; padding: 10px 12px; border-radius: 8px; transition: all 0.2s ease; border-left: 2px solid transparent; font-size: 0.9em; }
+        .nav-links a:hover { background: rgba(255, 255, 255, 0.1); color: white; border-left-color: var(--blue-accent); }
+        .nav-links a.active { background: rgba(255, 255, 255, 0.15); color: white; border-left-color: white; font-weight: 500; }
+        .nav-icon { width: 20px; text-align: center; margin-right: 10px; font-size: 1em; }
+        .logout-btn { margin: 15px 20px 0; padding: 12px; background: rgba(255, 255, 255, 0.15); color: white; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px; font-size: 0.9em; font-weight: 500; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .logout-btn:hover { background: var(--alert-red); border-color: var(--alert-red); transform: translateY(-1px); }
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .main-header { padding: 20px 35px; background: white; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .header-title h1 { font-size: 1.4em; color: var(--dark-blue); font-weight: 600; margin-bottom: 4px; }
+        .header-title p { color: var(--text-secondary); font-size: 0.9em; font-weight: 300; }
+        .content-wrapper { flex: 1; padding: 30px; overflow-y: auto; background: var(--main-bg); }
+        .welcome-section { background: linear-gradient(135deg, var(--dark-blue), var(--blue-medium)); color: white; padding: 30px; border-radius: 10px; margin-bottom: 30px; }
+        .welcome-text h2 { font-size: 1.5em; margin-bottom: 8px; font-weight: 600; }
+        .welcome-text p { font-size: 0.95em; opacity: 0.9; font-weight: 300; }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .status-card { background: var(--card-bg); padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04); border: 1px solid var(--border-color); }
+        .status-icon { font-size: 2em; margin-bottom: 12px; }
+        .status-title { font-size: 1em; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+        .status-description { color: var(--text-secondary); font-size: 0.85em; margin-bottom: 10px; }
+        .status-time { font-size: 0.8em; color: var(--dark-blue); font-weight: 500; }
+        .quick-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .stat-card { background: white; padding: 18px; border-radius: 10px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04); }
+        .stat-number { font-size: 1.8em; font-weight: 700; color: var(--dark-blue); margin: 8px 0; }
+        .stat-label { color: var(--text-secondary); font-size: 0.85em; font-weight: 300; }
+        .system-status-section { margin-bottom: 30px; }
+        .section-title { font-size: 1.2em; color: var(--dark-blue); margin-bottom: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        @media (max-width: 1200px) { .dashboard-container { height: auto; flex-direction: column; } .sidebar { width: 100%; height: auto; } .nav-menu { display: flex; flex-wrap: wrap; gap: 10px; padding: 15px; } .nav-section { flex: 1; min-width: 200px; margin-bottom: 15px; } .main-content { width: 100%; } }
+        @media (max-width: 768px) { .content-wrapper { padding: 20px; } .main-header { padding: 15px 20px; flex-direction: column; align-items: flex-start; gap: 15px; } .status-grid, .quick-stats { grid-template-columns: 1fr; } .welcome-section { padding: 20px; } }
     </style>
 </head>
 <body>
