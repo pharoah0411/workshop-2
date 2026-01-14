@@ -158,7 +158,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_presc'])) {
                     $target_conn->beginTransaction();
                     $date_func = ($target_source === 'Postgres') ? "CURRENT_TIMESTAMP" : "GETDATE()";
                     $insH = $target_conn->prepare("INSERT INTO PRESCRIPTION (PATIENT_ID, PHARMACIST_ID, DATE_ISSUED, STATUS) VALUES (?, ?, $date_func, 'Pending')");
-                    $insH->execute([$sqlPatientId, $sqlPharmacistId]);
+                    // Insert the current username string for PostgreSQL and SQL Server as requested
+                    $insH->execute([$sqlPatientId, $username]);
                     $lastId = $target_conn->lastInsertId();
 
                     foreach ($sourceItems as $item) {
