@@ -119,20 +119,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     /* =========================
-       3) SQL SERVER (PDO) - FIXED: Use $pdo_sqlsrv
+       3) SQL SERVER (PDO)
     ========================= */
     if (($target_source === "SQLServer" || $target_source === "All") && isset($pdo_sqlsrv) && $pdo_sqlsrv instanceof PDO) {
         $attempt_count++;
         try {
             $pdo_sqlsrv->beginTransaction();
 
-            // USER
             $stmtUser = $pdo_sqlsrv->prepare("INSERT INTO [USER] (username, password, role) VALUES (?, ?, 'patient')");
             $stmtUser->execute([$username_generated, $password_generated]);
 
-            $newUserId = $pdo_sqlsrv->query("SELECT SCOPE_IDENTITY()")->fetchColumn();
+            // FIXED: Using standard PDO lastInsertId
+            $newUserId = $pdo_sqlsrv->lastInsertId();
 
-            // PATIENT
+            if (!$newUserId) throw new Exception("Failed to retrieve new User ID.");
+
             $stmtPatient = $pdo_sqlsrv->prepare(
                 "INSERT INTO patient (user_id, gender, dob, address, ic_no, name)
                  VALUES (?, ?, ?, ?, ?, ?)"
