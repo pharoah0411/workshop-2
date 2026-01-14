@@ -2,7 +2,6 @@
 require_once 'session_check.php'; 
 require_once 'connection.php'; 
 
-// FETCH USERNAME FROM SESSION
 $username = $_SESSION['username'] ?? 'User';
 $userRole = $_SESSION['role'] ?? 'Pharmacist';
 $error = '';
@@ -13,7 +12,7 @@ $final_source = '';
 $all_patients = [];
 $all_medicines = [];
 
-// 1. AGGREGATED FETCH: Used for the search dropdowns
+// 1. AGGREGATED FETCH: Store the 'SOURCE' for every item
 try {
     $fetchAcross = function($conn, $type, $sourceName) use (&$all_patients, &$all_medicines) {
         $p_sql = "SELECT PATIENT_ID, NAME, IC_NO FROM PATIENT";
@@ -48,31 +47,13 @@ try {
         }
     };
 
-    if (isset($mysql_conn2)) $fetchAcross($mysql_conn2, 'mysql', 'MySQL');
-    if (isset($pg_conn)) $fetchAcross($pg_conn, 'pdo', 'Postgres');
+    // ORDER CHANGED: SQLServer -> Postgres -> MySQL (MySQL is last and takes priority)
     if (isset($pdo_sqlsrv)) $fetchAcross($pdo_sqlsrv, 'pdo', 'SQLServer');
+    if (isset($pg_conn)) $fetchAcross($pg_conn, 'pdo', 'Postgres');
+    if (isset($mysql_conn2)) $fetchAcross($mysql_conn2, 'mysql', 'MySQL');
 
     ksort($all_patients);
 } catch (Exception $e) { $error = "Fetch Error: " . $e->getMessage(); }
-
-/**
- * HELPER: Resolve Medicine ID in MySQL
- * Ensures the medicine exists in MySQL so the DETAIL table can link to it.
- */
-function getLocalMedicineId($mysql_conn, $medicineName) {
-    $stmt = $mysql_conn->prepare("SELECT MEDICINE_ID FROM MEDICINE WHERE NAME = ?");
-    $stmt->bind_param("s", $medicineName);
-    $stmt->execute();
-    $res = $stmt->get_result()->fetch_assoc();
-    
-    if ($res) return $res['MEDICINE_ID'];
-
-    // If not found in MySQL, create a placeholder entry
-    $ins = $mysql_conn->prepare("INSERT INTO MEDICINE (NAME, UNIT_PRICE, QUANTITY_IN_STOCK) VALUES (?, 0.00, 0)");
-    $ins->bind_param("s", $medicineName);
-    $ins->execute();
-    return $mysql_conn->insert_id;
-}
 
 // 2. DYNAMIC INSERT LOGIC
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_presc'])) {
@@ -81,77 +62,120 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_presc'])) {
 
     if (!empty($patient_ic) && !empty($items)) {
         try {
-            // FORCE TARGET TO MYSQL AS REQUESTED
-            $target_source = 'MySQL';
+            $first_med_name = strtoupper(trim($items[0]['med_name'] ?? ''));
+            if (!isset($all_medicines[$first_med_name])) {
+                throw new Exception("Medicine not found in any system.");
+            }
+            
+            $target_source = $all_medicines[$first_med_name]['DB_SOURCE'];
             $final_source = $target_source;
-            $target_conn = $mysql_conn2;
 
-            if (!$target_conn) throw new Exception("MySQL connection is unavailable.");
+            $target_conn = null;
+            if ($target_source === 'MySQL') $target_conn = $mysql_conn2;
+            elseif ($target_source === 'Postgres') $target_conn = $pg_conn;
+            elseif ($target_source === 'SQLServer') $target_conn = $pdo_sqlsrv;
 
-            // C. SYNC PHARMACIST (SESSION USERNAME) TO MYSQL
+            // C. SYNC PHARMACIST TO TARGET DB
             $sqlPharmacistId = null;
-            $st = $target_conn->prepare("SELECT USER_ID FROM `USER` WHERE USERNAME = ?");
-            $st->bind_param("s", $username); 
-            $st->execute();
-            $sqlPharmacistId = $st->get_result()->fetch_assoc()['USER_ID'] ?? null;
+            if ($target_source === 'MySQL') {
+                $st = $target_conn->prepare("SELECT USER_ID FROM `USER` WHERE USERNAME = ?");
+                $st->bind_param("s", $username); $st->execute();
+                $sqlPharmacistId = $st->get_result()->fetch_assoc()['USER_ID'] ?? null;
+            } else {
+                $tableName = ($target_source === 'SQLServer') ? "[USER]" : "\"user\"";
+                $st = $target_conn->prepare("SELECT USER_ID FROM $tableName WHERE USERNAME = ?");
+                $st->execute([$username]);
+                $sqlPharmacistId = $st->fetchColumn() ?: null;
+            }
 
             if (!$sqlPharmacistId) {
                 $role = $_SESSION['role'] ?? 'Pharmacist';
-                $tempPass = password_hash('SyncPassword123!', PASSWORD_DEFAULT); 
-                $insP = $target_conn->prepare("INSERT INTO `USER` (USERNAME, PASSWORD, ROLE) VALUES (?, ?, ?)");
-                $insP->bind_param("sss", $username, $tempPass, $role);
-                $insP->execute();
-                $sqlPharmacistId = $target_conn->insert_id;
+                $tempPass = 'SyncPassword123!'; 
+                if ($target_source === 'MySQL') {
+                    $insP = $target_conn->prepare("INSERT INTO `USER` (USERNAME, PASSWORD, ROLE) VALUES (?, ?, ?)");
+                    $insP->bind_param("sss", $username, $tempPass, $role); $insP->execute();
+                    $sqlPharmacistId = $target_conn->insert_id;
+                } else {
+                    $tableName = ($target_source === 'SQLServer') ? "[USER]" : "\"user\"";
+                    $insP = $target_conn->prepare("INSERT INTO $tableName (username, password, role) VALUES (?, ?, ?)");
+                    $insP->execute([$username, $tempPass, $role]);
+                    $sqlPharmacistId = $target_conn->lastInsertId(); // FIXED: Standard PDO retrieval
+                }
             }
 
-            // D. SYNC PATIENT TO MYSQL
+            // D. SYNC PATIENT TO TARGET DB
             $sqlPatientId = null;
-            $st = $target_conn->prepare("SELECT PATIENT_ID FROM PATIENT WHERE IC_NO = ?");
-            $st->bind_param("s", $patient_ic); 
-            $st->execute();
-            $sqlPatientId = $st->get_result()->fetch_assoc()['PATIENT_ID'] ?? null;
+            if ($target_source === 'MySQL') {
+                $st = $target_conn->prepare("SELECT PATIENT_ID FROM PATIENT WHERE IC_NO = ?");
+                $st->bind_param("s", $patient_ic); $st->execute();
+                $sqlPatientId = $st->get_result()->fetch_assoc()['PATIENT_ID'] ?? null;
+            } else {
+                $st = $target_conn->prepare("SELECT PATIENT_ID FROM PATIENT WHERE IC_NO = ?");
+                $st->execute([$patient_ic]);
+                $sqlPatientId = $st->fetchColumn() ?: null;
+            }
 
             if (!$sqlPatientId && isset($all_patients[$patient_ic])) {
                 $pData = $all_patients[$patient_ic];
-                $ins = $target_conn->prepare("INSERT INTO PATIENT (NAME, IC_NO) VALUES (?, ?)");
-                $ins->bind_param("ss", $pData['NAME'], $pData['IC_NO']); 
-                $ins->execute();
-                $sqlPatientId = $target_conn->insert_id;
-            }
-
-            if (!$sqlPatientId) throw new Exception("Patient not found in system.");
-
-            // E. FINAL INSERT INTO MYSQL
-            $target_conn->begin_transaction();
-            
-            $insH = $target_conn->prepare("INSERT INTO PRESCRIPTION (PATIENT_ID, PHARMACIST_ID, DATE_ISSUED, STATUS) VALUES (?, ?, NOW(), 'Pending')");
-            $insH->bind_param("ii", $sqlPatientId, $sqlPharmacistId); 
-            $insH->execute();
-            $lastId = $target_conn->insert_id;
-
-            if (!$lastId) throw new Exception("Failed to generate Prescription ID in MySQL.");
-
-            foreach ($items as $item) {
-                $mName = strtoupper(trim($item['med_name']));
-                
-                // Resolve the local MySQL Medicine ID
-                $mId = getLocalMedicineId($target_conn, $mName);
-                
-                $dose = ($item['dose_choice'] ?? '') . " (" . ($item['dose_custom'] ?? 'Std') . ")";
-                $instr = implode(", ", $item['timing'] ?? []) . " - " . ($item['instr_freq'] ?? '');
-                $qty = intval($item['qty'] ?? 1);
-                
-                $insD = $target_conn->prepare("INSERT INTO PRESCRIPTION_DETAIL (PRESCRIPTION_ID, MEDICINE_ID, DOSAGE, QUANTITY, INSTRUCTION) VALUES (?, ?, ?, ?, ?)");
-                $insD->bind_param("iisis", $lastId, $mId, $dose, $qty, $instr); 
-                $insD->execute();
+                if ($target_source === 'MySQL') {
+                    $ins = $target_conn->prepare("INSERT INTO PATIENT (NAME, IC_NO) VALUES (?, ?)");
+                    $ins->bind_param("ss", $pData['NAME'], $pData['IC_NO']); $ins->execute();
+                    $sqlPatientId = $target_conn->insert_id;
+                } else {
+                    $ins = $target_conn->prepare("INSERT INTO PATIENT (NAME, IC_NO) VALUES (?, ?)");
+                    $ins->execute([$pData['NAME'], $pData['IC_NO']]);
+                    $sqlPatientId = $target_conn->lastInsertId(); // FIXED: Standard PDO retrieval
+                }
             }
             
-            $target_conn->commit();
-            $success_msg = "Prescription Saved to MySQL Successfully!";
+            // CRITICAL CHECK: Prevent insertion if IDs are missing
+            if (!$sqlPatientId || !$sqlPharmacistId) {
+                throw new Exception("Synchronization failed. Could not identify Patient or Pharmacist in $target_source.");
+            }
+
+            // E. FINAL INSERT
+            if ($target_source === 'MySQL') {
+                $target_conn->begin_transaction();
+                $insH = $target_conn->prepare("INSERT INTO PRESCRIPTION (PATIENT_ID, PHARMACIST_ID, DATE_ISSUED, STATUS) VALUES (?, ?, NOW(), 'Pending')");
+                $insH->bind_param("ii", $sqlPatientId, $sqlPharmacistId); $insH->execute();
+                $lastId = $target_conn->insert_id;
+
+                foreach ($items as $item) {
+                    $mName = strtoupper(trim($item['med_name']));
+                    $mId = $all_medicines[$mName]['MEDICINE_ID'];
+                    $dose = ($item['dose_choice'] ?? '') . " (" . ($item['dose_custom'] ?? 'Std') . ")";
+                    $instr = implode(", ", $item['timing'] ?? []) . " - " . ($item['instr_freq'] ?? '');
+                    $qty = intval($item['qty'] ?? 1);
+                    $insD = $target_conn->prepare("INSERT INTO PRESCRIPTION_DETAIL (PRESCRIPTION_ID, MEDICINE_ID, DOSAGE, QUANTITY, INSTRUCTION) VALUES (?, ?, ?, ?, ?)");
+                    $insD->bind_param("iisis", $lastId, $mId, $dose, $qty, $instr); $insD->execute();
+                }
+                $target_conn->commit();
+            } else {
+                $target_conn->beginTransaction();
+                $date_func = ($target_source === 'Postgres') ? "CURRENT_TIMESTAMP" : "GETDATE()";
+                $insH = $target_conn->prepare("INSERT INTO PRESCRIPTION (PATIENT_ID, PHARMACIST_ID, DATE_ISSUED, STATUS) VALUES (?, ?, $date_func, 'Pending')");
+                $insH->execute([$sqlPatientId, $sqlPharmacistId]);
+                $lastId = $target_conn->lastInsertId(); // FIXED: Standard PDO retrieval
+
+                if (!$lastId) throw new Exception("Failed to retrieve Prescription ID from $target_source.");
+
+                foreach ($items as $item) {
+                    $mName = strtoupper(trim($item['med_name']));
+                    $mId = $all_medicines[$mName]['MEDICINE_ID'];
+                    $dose = ($item['dose_choice'] ?? '') . " (" . ($item['dose_custom'] ?? 'Std') . ")";
+                    $instr = implode(", ", $item['timing'] ?? []) . " - " . ($item['instr_freq'] ?? '');
+                    $qty = intval($item['qty'] ?? 1);
+                    $insD = $target_conn->prepare("INSERT INTO PRESCRIPTION_DETAIL (PRESCRIPTION_ID, MEDICINE_ID, DOSAGE, QUANTITY, INSTRUCTION) VALUES (?, ?, ?, ?, ?)");
+                    $insD->execute([$lastId, $mId, $dose, $qty, $instr]);
+                }
+                $target_conn->commit();
+            }
+
+            $success_msg = "Prescription Saved to $target_source Successfully!";
             $last_id = $lastId;
-
         } catch (Exception $e) {
-            if (isset($target_conn) && $target_conn instanceof mysqli) $target_conn->rollback();
+            if ($target_conn instanceof PDO && $target_conn->inTransaction()) $target_conn->rollBack();
+            if ($target_conn instanceof mysqli) @$target_conn->rollback();
             $error = "Save Error: " . $e->getMessage();
         }
     }

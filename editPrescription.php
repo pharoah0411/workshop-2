@@ -13,6 +13,37 @@ if ($id <= 0 || empty($source)) {
     exit;
 }
 
+/**
+ * HELPER: Parse Dosage string back into components for form fields
+ */
+function parseDosage($doseStr) {
+    $res = ['choice' => '', 'custom' => ''];
+    // Matches "1 Tablet (500mg)"
+    if (preg_match('/^(.*?)\s\((.*?)\)$/', (string)$doseStr, $matches)) {
+        $res['choice'] = $matches[1];
+        $res['custom'] = $matches[2];
+    } else {
+        $res['choice'] = $doseStr;
+    }
+    return $res;
+}
+
+/**
+ * HELPER: Parse Instruction string back into components for form fields
+ */
+function parseInstruction($instrStr) {
+    $res = ['timing' => [], 'freq' => ''];
+    // Matches "Morning, Night - 1x Daily"
+    $parts = explode(' - ', (string)$instrStr);
+    if (count($parts) >= 2) {
+        $res['timing'] = array_map('trim', explode(', ', $parts[0]));
+        $res['freq'] = trim($parts[1]);
+    } else {
+        $res['freq'] = $instrStr;
+    }
+    return $res;
+}
+
 // Select Connection for the Prescription Target
 $conn = null;
 if ($source === 'MySQL') $conn = $mysql_conn2;
@@ -58,8 +89,6 @@ function resolveMedicineId($conn, $source, $medicineName) {
     }
 }
 
-// ... (Keep your existing parseDosage and parseInstruction functions) ...
-
 $pres = null;
 $items = [];
 $medicines = [];
@@ -78,21 +107,21 @@ try {
 
     // 2. Fetch Global Medicine List (Store Name as well as ID)
     $sqlM = "SELECT MEDICINE_ID, NAME FROM MEDICINE ORDER BY NAME";
-    $uniqueMeds = [];
     foreach ([$mysql_conn2, $pg_conn, $pdo_sqlsrv] as $c) {
         if (!$c) continue;
         if ($c instanceof mysqli) {
             $res = $c->query($sqlM);
-            while($r = $res ? $res->fetch_assoc() : null) $uniqueMeds[$r['NAME']] = $r['NAME'];
+            while($r = $res ? $res->fetch_assoc() : null) $medicines[$r['NAME']] = ['MEDICINE_ID' => $r['MEDICINE_ID'], 'NAME' => $r['NAME']];
         } else {
             $stmt = $c->query($sqlM);
             while($r = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null) {
                 $name = $r['NAME'] ?? $r['name'];
-                $uniqueMeds[$name] = $name;
+                $mid = $r['MEDICINE_ID'] ?? $r['medicine_id'];
+                $medicines[$name] = ['MEDICINE_ID' => $mid, 'NAME' => $name];
             }
         }
     }
-    asort($uniqueMeds);
+    ksort($medicines);
     
     // Fetch Current Details
     $sqlD = "SELECT pd.DOSAGE, pd.QUANTITY, pd.INSTRUCTION, m.NAME AS MED_NAME FROM PRESCRIPTION_DETAIL pd JOIN MEDICINE m ON pd.MEDICINE_ID = m.MEDICINE_ID WHERE pd.PRESCRIPTION_ID = ?";
@@ -727,7 +756,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body>
-    <!-- Sidebar -->
     <aside class="sidebar">
         <div class="pharmacy-logo">
             <h1><i class="fas fa-pills"></i> PHARMACY SYSTEM</h1>
@@ -777,7 +805,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </button>
     </aside>
 
-    <!-- Main Content -->
     <main class="main-content">
         <header class="main-header">
             <div class="header-title">
@@ -816,7 +843,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php endif; ?>
 
                     <form method="POST">
-                        <!-- Status Section -->
                         <div class="form-group">
                             <label class="form-label">
                                 <i class="fas fa-tasks"></i> Prescription Status
@@ -829,7 +855,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         <hr style="margin: 30px 0; border: none; border-top: 1px solid #e9ecef;">
 
-                        <!-- Medication Items Section -->
                         <h3 style="color: var(--dark-blue); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
                             <i class="fas fa-prescription-bottle-alt"></i> Medication Items
                         </h3>
@@ -847,10 +872,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <div class="form-grid">
                                     <div>
                                         <label class="form-label">Medicine</label>
-                                        <select name="meds[<?= $idx ?>][med_id]" class="form-control" required>
+                                        <select name="meds[<?= $idx ?>][med_name]" class="form-control" required>
                                             <option value="">Select Medicine...</option>
                                             <?php foreach($medicines as $m): ?>
-                                            <option value="<?= $m['MEDICINE_ID'] ?>" <?= $m['MEDICINE_ID'] == ($item['MEDICINE_ID'] ?? 0) ? 'selected' : '' ?>>
+                                            <option value="<?= htmlspecialchars($m['NAME']) ?>" <?= ($item['MED_NAME'] == $m['NAME']) ? 'selected' : '' ?>>
                                                 <?= htmlspecialchars($m['NAME']) ?>
                                             </option>
                                             <?php endforeach; ?>
@@ -933,7 +958,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <i class="fas fa-plus"></i> Add New Medication Item
                         </button>
 
-                        <!-- Action Buttons -->
                         <div class="action-buttons">
                             <a href="prescriptionDashboard.php" class="btn btn-secondary">
                                 <i class="fas fa-times"></i> Cancel
@@ -948,7 +972,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </main>
 
-    <!-- Template for new medication row -->
     <template id="row-tpl">
         <div class="item-row">
             <button type="button" class="remove-btn" onclick="this.parentElement.remove()">
@@ -958,10 +981,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="form-grid">
                 <div>
                     <label class="form-label">Medicine</label>
-                    <select name="meds[IDX][med_id]" class="form-control" required>
+                    <select name="meds[IDX][med_name]" class="form-control" required>
                         <option value="">Select Medicine...</option>
                         <?php foreach($medicines as $m): ?>
-                        <option value="<?= $m['MEDICINE_ID'] ?>"><?= htmlspecialchars($m['NAME']) ?></option>
+                        <option value="<?= htmlspecialchars($m['NAME']) ?>"><?= htmlspecialchars($m['NAME']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
