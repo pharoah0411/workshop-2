@@ -1,14 +1,13 @@
 <?php
-require_once "session_check.php";   // ✅ auto logout + login check
+require_once "session_check.php";
 require_once 'connection.php';
 
-// Check if user is NOT logged in. If not, redirect to login page.
+// Check login
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
 
-// 🔐 Logged in but forced to reset password
 if (!empty($_SESSION['force_reset'])) {
     header("Location: reset_password.php");
     exit;
@@ -16,6 +15,114 @@ if (!empty($_SESSION['force_reset'])) {
 
 $userRole = $_SESSION['role'] ?? 'Guest';
 $username = $_SESSION['username'] ?? 'User';
+
+// ========== DYNAMIC DATA FETCHING ==========
+$stats = [
+    'medicine_count' => 0,
+    'low_stock_count' => 0,
+    'pending_prescriptions' => 0,
+    'total_patients' => 0,
+    'total_users' => 0,
+    'low_stock_medicines' => [],
+    'pending_prescription_list' => [],
+    'recent_prescriptions' => [],
+    'recent_patients' => []
+];
+
+// Database connection status
+$mysql_connected = ($mysql_conn2 && $mysql_conn2 instanceof mysqli);
+$sqlserver_connected = (isset($pdo) && $pdo instanceof PDO);
+$postgresql_connected = (isset($pg_conn) && $pg_conn instanceof PDO);
+
+// Only fetch if MySQL is connected
+if ($mysql_connected) {
+    try {
+        // 1. Medicine Statistics
+        $result = $mysql_conn2->query("SELECT COUNT(*) as count FROM MEDICINE");
+        if ($result) {
+            $row = $result->fetch_assoc();
+            $stats['medicine_count'] = $row['count'] ?? 0;
+        }
+        
+        // 2. Low Stock Medicines (less than or equal to 50 quantity) - FIXED!
+        $low_stock_threshold = 50;
+        $result = $mysql_conn2->query("SELECT COUNT(*) as count FROM MEDICINE WHERE quantity <= $low_stock_threshold");
+        if ($result) {
+            $row = $result->fetch_assoc();
+            $stats['low_stock_count'] = $row['count'] ?? 0;
+        }
+        
+        // 3. Low Stock Medicine Names - FIXED!
+        $result = $mysql_conn2->query("SELECT medicine_name, quantity FROM MEDICINE WHERE quantity <= $low_stock_threshold ORDER BY quantity ASC LIMIT 5");
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $stats['low_stock_medicines'][] = $row;
+            }
+        }
+        
+        // 4. Pending Prescriptions
+        $result = $mysql_conn2->query("SELECT COUNT(*) as count FROM PRESCRIPTION WHERE status = 'pending' OR status IS NULL");
+        if ($result) {
+            $row = $result->fetch_assoc();
+            $stats['pending_prescriptions'] = $row['count'] ?? 0;
+        }
+        
+        // 5. Recent Prescriptions
+        $result = $mysql_conn2->query("SELECT p.prescription_id, p.date_issued, pat.first_name, pat.last_name 
+                                       FROM PRESCRIPTION p 
+                                       LEFT JOIN PATIENT pat ON p.patient_id = pat.patient_id 
+                                       ORDER BY p.date_issued DESC LIMIT 5");
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $stats['recent_prescriptions'][] = $row;
+            }
+        }
+        
+        // 6. Pending Prescription List
+        $result = $mysql_conn2->query("SELECT p.prescription_id, p.date_issued, pat.first_name, pat.last_name 
+                                       FROM PRESCRIPTION p 
+                                       LEFT JOIN PATIENT pat ON p.patient_id = pat.patient_id 
+                                       WHERE p.status = 'pending' OR p.status IS NULL 
+                                       ORDER BY p.date_issued DESC LIMIT 3");
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $stats['pending_prescription_list'][] = $row;
+            }
+        }
+        
+        // 7. Total Patients
+        $result = $mysql_conn2->query("SELECT COUNT(*) as count FROM PATIENT");
+        if ($result) {
+            $row = $result->fetch_assoc();
+            $stats['total_patients'] = $row['count'] ?? 0;
+        }
+        
+        // 8. Recent Patients
+        $result = $mysql_conn2->query("SELECT first_name, last_name, created_at FROM PATIENT ORDER BY created_at DESC LIMIT 3");
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                $stats['recent_patients'][] = $row;
+            }
+        }
+        
+        // 9. Total Users
+        $result = $mysql_conn2->query("SELECT COUNT(*) as count FROM USER");
+        if ($result) {
+            $row = $result->fetch_assoc();
+            $stats['total_users'] = $row['count'] ?? 0;
+        }
+        
+    } catch (Exception $e) {
+        // Keep default stats if query fails
+        error_log("Dashboard stats error: " . $e->getMessage());
+    }
+}
+
+// Calculate connected databases count
+$connected_dbs = 0;
+if ($mysql_connected) $connected_dbs++;
+if ($sqlserver_connected) $connected_dbs++;
+if ($postgresql_connected) $connected_dbs++;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -332,72 +439,6 @@ $username = $_SESSION['username'] ?? 'User';
             font-weight: 300;
         }
 
-        /* Important Notices */
-        .notices-section {
-            margin-bottom: 30px;
-        }
-
-        .section-title {
-            font-size: 1.2em;
-            color: var(--dark-blue);
-            margin-bottom: 15px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .notices-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 15px;
-        }
-
-        .notice-card {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 10px;
-            border-left: 4px solid var(--dark-blue);
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
-            transition: transform 0.2s ease;
-        }
-
-        .notice-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-        }
-
-        .notice-card.urgent {
-            border-left-color: var(--alert-red);
-        }
-
-        .notice-card.warning {
-            border-left-color: var(--warning-orange);
-        }
-
-        .notice-title {
-            font-size: 1em;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .notice-content {
-            color: var(--text-secondary);
-            margin-bottom: 12px;
-            line-height: 1.5;
-            font-size: 0.9em;
-        }
-
-        .notice-date {
-            font-size: 0.8em;
-            color: var(--dark-blue);
-            font-weight: 500;
-        }
-
         /* System Status Grid */
         .status-grid {
             display: grid;
@@ -418,7 +459,6 @@ $username = $_SESSION['username'] ?? 'User';
         .status-icon {
             font-size: 2em;
             margin-bottom: 12px;
-            color: var(--dark-blue);
         }
 
         .status-title {
@@ -476,6 +516,7 @@ $username = $_SESSION['username'] ?? 'User';
             padding: 25px;
             border-radius: 10px;
             border: 1px solid var(--border-color);
+            margin-bottom: 30px;
         }
 
         .activity-list {
@@ -498,11 +539,9 @@ $username = $_SESSION['username'] ?? 'User';
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            background: var(--blue-light);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--dark-blue);
             font-size: 1em;
         }
 
@@ -520,6 +559,21 @@ $username = $_SESSION['username'] ?? 'User';
             color: var(--text-secondary);
             font-size: 0.8em;
             font-weight: 300;
+        }
+
+        /* System Status Section */
+        .system-status-section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.2em;
+            color: var(--dark-blue);
+            margin-bottom: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         /* Responsive Design */
@@ -572,7 +626,6 @@ $username = $_SESSION['username'] ?? 'User';
                 width: 100%;
             }
             
-            .notices-grid,
             .status-grid,
             .quick-stats {
                 grid-template-columns: 1fr;
@@ -631,7 +684,7 @@ $username = $_SESSION['username'] ?? 'User';
 
             <nav class="nav-menu">
                 <div class="nav-section">
-                    <div class="nav-title">Medical Operations</div>
+                    <div class="nav-title">NAVIGATION</div>
                     <ul class="nav-links">
                         <li><a href="dashboard.php" class="active"><i class="fas fa-pills nav-icon"></i>Dashboard</a></li>
                         <li><a href="medDirectory.php"><i class="fas fa-pills nav-icon"></i>Medicine Inventory</a></li>
@@ -641,7 +694,7 @@ $username = $_SESSION['username'] ?? 'User';
                 </div>
 
                 <div class="nav-section">
-                    <div class="nav-title">Administration</div>
+                    <div class="nav-title">ADMINISTRATION</div>
                     <ul class="nav-links">
                         <li><a href="user_management.php"><i class="fas fa-users nav-icon"></i>User Management</a></li>
                         <li><a href="reports.php"><i class="fas fa-chart-bar nav-icon"></i>Reports</a></li>
@@ -682,67 +735,67 @@ $username = $_SESSION['username'] ?? 'User';
                 <!-- Quick Stats -->
                 <div class="quick-stats">
                     <div class="stat-card">
-                        <div class="stat-number">142</div>
+                        <div class="stat-number"><?php echo $stats['medicine_count']; ?></div>
                         <div class="stat-label">Medicines in Stock</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number">8</div>
+                        <div class="stat-number"><?php echo $stats['low_stock_count']; ?></div>
                         <div class="stat-label">Low Stock Items</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number">15</div>
+                        <div class="stat-number"><?php echo $stats['pending_prescriptions']; ?></div>
                         <div class="stat-label">Pending Prescriptions</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number">24/7</div>
-                        <div class="stat-label">System Active</div>
+                        <div class="stat-number"><?php echo $connected_dbs; ?>/3</div>
+                        <div class="stat-label">DBs Connected</div>
                     </div>
                 </div>
 
-                <!-- Important Notices -->
-                <section class="notices-section">
-                    <h2 class="section-title"><i class="fas fa-bell"></i> Important Notices</h2>
-                    <div class="notices-grid">
-                        <div class="notice-card urgent">
-                            <div class="notice-title"><i class="fas fa-exclamation-triangle"></i> Low Stock Alert</div>
-                            <div class="notice-content">8 critical medicines are running low. Please review inventory immediately.</div>
-                            <div class="notice-date">Updated today</div>
-                        </div>
-                        <div class="notice-card">
-                            <div class="notice-title"><i class="fas fa-shield-alt"></i> System Backup</div>
-                            <div class="notice-content">Last database backup completed successfully at 02:00 AM.</div>
-                            <div class="notice-date">Updated yesterday</div>
-                        </div>
-                    </div>
-                </section>
-
                 <!-- System Status -->
-                <section class="notices-section">
+                <section class="system-status-section">
                     <h2 class="section-title"><i class="fas fa-heartbeat"></i> System Status</h2>
                     <div class="status-grid">
                         <div class="status-card">
-                            <div class="status-icon"><i class="fas fa-server"></i></div>
-                            <h3 class="status-title">Database</h3>
-                            <p class="status-description">Running optimally</p>
-                            <div class="status-time">Checked 10 min ago</div>
+                            <div class="status-icon" style="color: <?php echo $mysql_connected ? '#5cb85c' : '#d9534f'; ?>">
+                                <i class="fas <?php echo $mysql_connected ? 'fa-check-circle' : 'fa-times-circle'; ?>"></i>
+                            </div>
+                            <h3 class="status-title">MySQL Database</h3>
+                            <p class="status-description"><?php echo $mysql_connected ? 'Connected' : 'Disconnected'; ?></p>
+                            <div class="status-time">
+                                <?php echo $mysql_connected ? 'Live Data' : 'Offline'; ?>
+                            </div>
                         </div>
                         <div class="status-card">
-                            <div class="status-icon"><i class="fas fa-prescription"></i></div>
-                            <h3 class="status-title">Prescriptions</h3>
-                            <p class="status-description">Processing normally</p>
-                            <div class="status-time">Active</div>
+                            <div class="status-icon" style="color: <?php echo $sqlserver_connected ? '#5cb85c' : '#8a8a8a'; ?>">
+                                <i class="fas <?php echo $sqlserver_connected ? 'fa-check-circle' : 'fa-times-circle'; ?>"></i>
+                            </div>
+                            <h3 class="status-title">SQL Server</h3>
+                            <p class="status-description"><?php echo $sqlserver_connected ? 'Connected' : 'Not configured'; ?></p>
+                            <div class="status-time">
+                                <?php echo $sqlserver_connected ? 'Team Database' : 'N/A'; ?>
+                            </div>
                         </div>
                         <div class="status-card">
-                            <div class="status-icon"><i class="fas fa-pills"></i></div>
-                            <h3 class="status-title">Inventory</h3>
-                            <p class="status-description">142 medicines tracked</p>
-                            <div class="status-time">Updated just now</div>
+                            <div class="status-icon" style="color: <?php echo $postgresql_connected ? '#5cb85c' : '#8a8a8a'; ?>">
+                                <i class="fas <?php echo $postgresql_connected ? 'fa-check-circle' : 'fa-times-circle'; ?>"></i>
+                            </div>
+                            <h3 class="status-title">PostgreSQL</h3>
+                            <p class="status-description"><?php echo $postgresql_connected ? 'Connected' : 'Not configured'; ?></p>
+                            <div class="status-time">
+                                <?php echo $postgresql_connected ? 'Team Database' : 'N/A'; ?>
+                            </div>
                         </div>
                         <div class="status-card">
-                            <div class="status-icon"><i class="fas fa-shield-alt"></i></div>
-                            <h3 class="status-title">Security</h3>
-                            <p class="status-description">All systems secure</p>
-                            <div class="status-time">Protected</div>
+                            <div class="status-icon" style="color: var(--dark-blue)">
+                                <i class="fas fa-capsules"></i>
+                            </div>
+                            <h3 class="status-title">Pharmacy Data</h3>
+                            <p class="status-description">
+                                <?php echo $stats['medicine_count']; ?> medicines<br>
+                                <?php echo $stats['total_patients']; ?> patients
+                            </p>
+                            <div class="status-time">Live from database</div>
                         </div>
                     </div>
                 </section>
@@ -752,33 +805,79 @@ $username = $_SESSION['username'] ?? 'User';
                     <h2 class="section-title"><i class="fas fa-history"></i> Recent Activity</h2>
                     <ul class="activity-list">
                         <li class="activity-item">
-                            <div class="activity-icon"><i class="fas fa-user-check"></i></div>
+                            <div class="activity-icon" style="background: #e3f2fd; color: #1c4966;">
+                                <i class="fas fa-user-check"></i>
+                            </div>
                             <div class="activity-content">
-                                <div class="activity-text">You logged in to the system</div>
+                                <div class="activity-text">You logged in to the system as <?php echo htmlspecialchars($userRole); ?></div>
                                 <div class="activity-time"><?php echo date('h:i A'); ?></div>
                             </div>
                         </li>
+                        
+                        <?php if ($stats['medicine_count'] > 0): ?>
                         <li class="activity-item">
-                            <div class="activity-icon"><i class="fas fa-database"></i></div>
+                            <div class="activity-icon" style="background: #e3f2fd; color: #1c4966;">
+                                <i class="fas fa-pills"></i>
+                            </div>
                             <div class="activity-content">
-                                <div class="activity-text">System backup completed successfully</div>
-                                <div class="activity-time">Today, 02:00 AM</div>
+                                <div class="activity-text"><?php echo $stats['medicine_count']; ?> medicines in inventory</div>
+                                <div class="activity-time">Live count</div>
                             </div>
                         </li>
+                        <?php endif; ?>
+                        
+                        <?php if ($stats['total_patients'] > 0): ?>
                         <li class="activity-item">
-                            <div class="activity-icon"><i class="fas fa-pills"></i></div>
+                            <div class="activity-icon" style="background: #e3f2fd; color: #1c4966;">
+                                <i class="fas fa-user-injured"></i>
+                            </div>
                             <div class="activity-content">
-                                <div class="activity-text">Inventory updated - 5 new medicines added</div>
-                                <div class="activity-time">Yesterday, 04:30 PM</div>
+                                <div class="activity-text"><?php echo $stats['total_patients']; ?> patients in database</div>
+                                <div class="activity-time">Active records</div>
                             </div>
                         </li>
+                        <?php endif; ?>
+                        
+                        <?php if ($stats['low_stock_count'] > 0): ?>
                         <li class="activity-item">
-                            <div class="activity-icon"><i class="fas fa-prescription"></i></div>
+                            <div class="activity-icon" style="background: #f8d7da; color: #721c24;">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
                             <div class="activity-content">
-                                <div class="activity-text">15 new prescriptions processed</div>
-                                <div class="activity-time">Yesterday, 03:15 PM</div>
+                                <div class="activity-text"><?php echo $stats['low_stock_count']; ?> medicine(s) running low on stock</div>
+                                <div class="activity-time">Requires attention</div>
                             </div>
                         </li>
+                        <?php endif; ?>
+                        
+                        <?php if ($stats['pending_prescriptions'] > 0): ?>
+                        <li class="activity-item">
+                            <div class="activity-icon" style="background: #fff3cd; color: #856404;">
+                                <i class="fas fa-prescription"></i>
+                            </div>
+                            <div class="activity-content">
+                                <div class="activity-text"><?php echo $stats['pending_prescriptions']; ?> prescriptions pending processing</div>
+                                <div class="activity-time">Needs review</div>
+                            </div>
+                        </li>
+                        <?php endif; ?>
+                        
+                        <?php if (count($stats['recent_prescriptions']) > 0): ?>
+                        <li class="activity-item">
+                            <div class="activity-icon" style="background: #e3f2fd; color: #1c4966;">
+                                <i class="fas fa-file-medical"></i>
+                            </div>
+                            <div class="activity-content">
+                                <div class="activity-text">
+                                    Latest prescription: #<?php echo $stats['recent_prescriptions'][0]['prescription_id']; ?> 
+                                    for <?php echo htmlspecialchars($stats['recent_prescriptions'][0]['first_name'] . ' ' . $stats['recent_prescriptions'][0]['last_name']); ?>
+                                </div>
+                                <div class="activity-time">
+                                    <?php echo date('M d, h:i A', strtotime($stats['recent_prescriptions'][0]['date_issued'])); ?>
+                                </div>
+                            </div>
+                        </li>
+                        <?php endif; ?>
                     </ul>
                 </section>
             </div>
@@ -789,16 +888,14 @@ $username = $_SESSION['username'] ?? 'User';
         // Sidebar navigation active state
         document.querySelectorAll('.nav-links a').forEach(link => {
             link.addEventListener('click', function(e) {
-                // Store active page in sessionStorage before navigation
                 sessionStorage.setItem('activePage', this.getAttribute('href'));
-                // The actual navigation will happen via the href attribute
             });
         });
 
         // Restore active page on page load
         document.addEventListener('DOMContentLoaded', function() {
             const currentPage = window.location.pathname.split('/').pop();
-            const activePage = sessionStorage.getItem('activePage') || 'medDirectory.php';
+            const activePage = sessionStorage.getItem('activePage') || 'dashboard.php';
             
             document.querySelectorAll('.nav-links a').forEach(link => {
                 const linkPage = link.getAttribute('href');
@@ -827,22 +924,10 @@ $username = $_SESSION['username'] ?? 'User';
             }
         });
 
-        // Update time display
-        function updateTime() {
-            const now = new Date();
-            const timeElement = document.querySelector('.header-title p');
-            if (timeElement) {
-                timeElement.textContent = `Pharmacy Dashboard - ${now.toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                })}`;
-            }
-        }
-
-        // Initialize
-        updateTime();
+        // Auto-refresh dashboard every 60 seconds
+        setTimeout(function() {
+            window.location.reload();
+        }, 60000);
     </script>
 </body>
 </html>

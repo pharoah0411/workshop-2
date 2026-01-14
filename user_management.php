@@ -211,7 +211,7 @@ $userRole = $_SESSION['role'] ?? 'Admin';
             border-radius: 8px;
             font-size: 0.9em;
             font-weight: 500;
-            cursor: pointer;
+            cursor: button;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
@@ -610,15 +610,6 @@ $userRole = $_SESSION['role'] ?? 'Admin';
                     <ul class="module-list">
                         <li><a href="patient_list.php"><i class="fas fa-list"></i> View Patient List</a></li>
                         <li><a href="add_patient.php"><i class="fas fa-user-plus"></i> Add New Patient</a></li>
-                    </ul>
-                </div>
-
-                <div class="module-section">
-                    <div class="module-header">
-                        <i class="fas fa-lock"></i> Role & Permission Control
-                    </div>
-                    <ul class="module-list">
-                        <li><a href="permissions.php"><i class="fas fa-shield-alt"></i> Manage Role Permissions</a></li>
                     </ul>
                 </div>
             </div>

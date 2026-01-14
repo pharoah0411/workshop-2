@@ -1,12 +1,19 @@
 <?php
 require_once "auth_check.php";
-requireRole('admin');
+// Allow both admin and pharmacist to access user management
+if (!hasAnyRole(['admin', 'pharmacist'])) {
+    header('Location: dashboard.php?error=unauthorized');
+    exit;
+}
 
 require_once 'connection.php';
 
 // Get user info for sidebar
 $username = $_SESSION['username'] ?? 'User';
 $userRole = $_SESSION['role'] ?? 'Administrator';
+
+// Check if current user can delete (admin only)
+$canDelete = ($_SESSION['role'] ?? '') === 'admin';
 
 $all_users = [];
 
@@ -23,6 +30,7 @@ if (isset($pg_conn) && $pg_conn instanceof PDO) {
         ');
         while ($row = $query->fetch(PDO::FETCH_ASSOC)) {
             $row['source'] = 'Postgres';
+            $row['in_use'] = 0; // Not checking for Postgres
             $all_users[] = $row;
         }
     } catch (Exception $e) {}
@@ -77,6 +85,7 @@ if (isset($pdo_sqlsrv) && $pdo_sqlsrv instanceof PDO) {
         ");
         while ($row = $query->fetch(PDO::FETCH_ASSOC)) {
             $row['source'] = 'SQL Server';
+            $row['in_use'] = 0; // Not checking for SQL Server
             $all_users[] = $row;
         }
     } catch (Exception $e) {}
@@ -481,25 +490,42 @@ usort($all_users, function($a, $b) {
             font-weight: 700;
             color: #0b2f6d;
             font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
         /* Action links */
-        .link-edit {
-            color: #0056d2;
+        .action-link {
             font-weight: 600;
             text-decoration: none;
             margin-right: 10px;
             font-size: 0.9em;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .link-edit {
+            color: #0056d2;
         }
         .link-edit:hover { text-decoration: underline; }
 
         .link-delete {
-            color: #d90000;
-            font-weight: 600;
-            text-decoration: none;
-            font-size: 0.9em;
+            color: #dc3545;
+            font-weight: 700;
         }
         .link-delete:hover { text-decoration: underline; }
+
+        /* Admin-only badge */
+        .admin-only-badge {
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            font-style: italic;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
 
         /* Badge */
         .badge-inuse {
@@ -510,26 +536,32 @@ usort($all_users, function($a, $b) {
             color: #c20000;
             font-weight: 700;
             font-size: 0.8em;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
 
-        /* Add User Button */
-        .btn-add {
-            display: inline-block;
-            padding: 10px 16px;
-            background: #28a745;
-            color: #fff;
-            border-radius: 8px;
-            text-decoration: none;
+        /* Role Badge */
+        .role-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85em;
             font-weight: 600;
-            font-size: 0.9em;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
 
-        .btn-add:hover {
-            background: #218838;
-            transform: translateY(-1px);
+        .role-admin {
+            background: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #bbdefb;
+        }
+
+        .role-pharmacist {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
         }
 
         /* Statistics Grid */
@@ -658,7 +690,7 @@ usort($all_users, function($a, $b) {
                 padding: 15px;
             }
             
-            .source, .link-edit, .link-delete {
+            .source, .action-link {
                 font-size: 0.8em;
             }
             
@@ -703,6 +735,7 @@ usort($all_users, function($a, $b) {
                     <div class="nav-title">ADMINISTRATION</div>
                     <ul class="nav-links">
                         <li><a href="user_management.php" class="active"><i class="fas fa-users nav-icon"></i>User Management</a></li>
+                        <li><a href="patient_management.php"><i class="fas fa-user-injured nav-icon"></i>Patient Management</a></li>
                         <li><a href="reports.php"><i class="fas fa-chart-bar nav-icon"></i>Reports</a></li>
                         <li><a href="backup.php"><i class="fas fa-database nav-icon"></i>Backup & Restore</a></li>
                     </ul>
@@ -789,10 +822,13 @@ usort($all_users, function($a, $b) {
                                 $id = (int)($u['user_id'] ?? 0);
                                 $mysqlInUse = ($source === 'MySQL' && !empty($u['in_use']) && (int)$u['in_use'] > 0);
                                 $inUseCount = (int)($u['in_use'] ?? 0);
+                                $roleClass = ($u['role'] ?? '') === 'admin' ? 'role-admin' : 'role-pharmacist';
                             ?>
                             <tr>
-                                <td class="source"><?php echo htmlspecialchars($source); ?></td>
-                                <td><?php echo $id; ?></td>
+                                <td class="source">
+                                    <i class="fas fa-database"></i> <?php echo htmlspecialchars($source); ?>
+                                </td>
+                                <td><strong>#<?php echo $id; ?></strong></td>
                                 <td><?php echo htmlspecialchars($u['username'] ?? ''); ?></td>
                                 <td><?php echo htmlspecialchars($u['name'] ?? ''); ?></td>
                                 <td>
@@ -813,21 +849,34 @@ usort($all_users, function($a, $b) {
                                         <span style="color: var(--text-secondary);">-</span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?php echo ucfirst($u['role'] ?? ''); ?></td>
                                 <td>
-                                    <a class="link-edit"
+                                    <span class="role-badge <?php echo $roleClass; ?>">
+                                        <i class="fas fa-<?php echo ($u['role'] ?? '') === 'admin' ? 'user-shield' : 'user-md'; ?>"></i>
+                                        <?php echo ucfirst($u['role'] ?? ''); ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <a class="action-link link-edit"
                                        href="edit_user.php?id=<?php echo $id; ?>&db=<?php echo urlencode($source); ?>">
-                                        Edit
+                                        <i class="fas fa-edit"></i> Edit
                                     </a>
 
                                     <?php if ($mysqlInUse): ?>
-                                        <span class="badge-inuse">In Use (<?php echo $inUseCount; ?>)</span>
+                                        <span class="badge-inuse">
+                                            <i class="fas fa-lock"></i> In Use (<?php echo $inUseCount; ?>)
+                                        </span>
                                     <?php else: ?>
-                                        <a class="link-delete"
+                                        <?php if ($canDelete): ?>
+                                        <a class="action-link link-delete"
                                            href="delete_user.php?id=<?php echo $id; ?>&db=<?php echo urlencode($source); ?>"
-                                           onclick="return confirm('Delete this user from <?php echo htmlspecialchars($source); ?>?');">
-                                            Delete
+                                           onclick="return confirm('Delete this user from <?php echo htmlspecialchars($source); ?> database? This action cannot be undone.');">
+                                            <i class="fas fa-trash"></i> Delete
                                         </a>
+                                        <?php else: ?>
+                                        <span class="admin-only-badge">
+                                            <i class="fas fa-lock"></i> Admin only
+                                        </span>
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -838,16 +887,20 @@ usort($all_users, function($a, $b) {
                 <!-- Statistics Section -->
                 <?php if (!empty($all_users)): ?>
                 <div class="stats-grid" style="margin-top: 30px;">
-                    <div class="stat-card">
-                        <h3><?php echo count($all_users); ?></h3>
+                    <div class="stat-card" style="background: var(--blue-light); border-color: #e3f2fd;">
+                        <h3 style="color: var(--dark-blue);"><?php echo count($all_users); ?></h3>
                         <p>Total Users</p>
                     </div>
-                    <div class="stat-card">
-                        <h3><?php echo count(array_filter($all_users, fn($u) => ($u['role'] ?? '') === 'admin')); ?></h3>
+                    <div class="stat-card" style="background: #e3f2fd; border-color: #bbdefb;">
+                        <h3 style="color: #1565c0;">
+                            <?php echo count(array_filter($all_users, fn($u) => ($u['role'] ?? '') === 'admin')); ?>
+                        </h3>
                         <p>Administrators</p>
                     </div>
-                    <div class="stat-card">
-                        <h3><?php echo count(array_filter($all_users, fn($u) => ($u['role'] ?? '') === 'pharmacist')); ?></h3>
+                    <div class="stat-card" style="background: #e8f5e9; border-color: #c8e6c9;">
+                        <h3 style="color: #2e7d32;">
+                            <?php echo count(array_filter($all_users, fn($u) => ($u['role'] ?? '') === 'pharmacist')); ?>
+                        </h3>
                         <p>Pharmacists</p>
                     </div>
                 </div>

@@ -1,0 +1,9 @@
+🔧 RESTORE STARTED: 2026-01-14 19:50:09
+User: Mel
+File: pharmacy_backup_mysql_2026-01-14_19-40-44.sql
+Database: MYSQL
+File Size: 5346 bytes
+
+✅ RESTORE COMPLETED SUCCESSFULLY
+Records restored: 25
+Errors: 0
