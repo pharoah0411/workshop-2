@@ -3,7 +3,6 @@ require_once 'session_check.php';
 require_once 'connection.php'; 
 
 $username = $_SESSION['username'] ?? 'User';
-$userRole = $_SESSION['role'] ?? 'Pharmacist';
 $error = '';
 $success_msg = '';
 $last_id = null;
@@ -49,7 +48,7 @@ try {
 
     if (isset($mysql_conn2)) $fetchAcross($mysql_conn2, 'mysql', 'MySQL');
     if (isset($pg_conn)) $fetchAcross($pg_conn, 'pdo', 'Postgres');
-    if (isset($pdo_sqlsrv)) $fetchAcross($pdo_sqlsrv, 'pdo', 'SQLServer');
+    if (isset($pdo)) $fetchAcross($pdo, 'pdo', 'SQLServer');
 
     ksort($all_patients);
 } catch (Exception $e) { $error = "Fetch Error: " . $e->getMessage(); }
@@ -74,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_presc'])) {
             $target_conn = null;
             if ($target_source === 'MySQL') $target_conn = $mysql_conn2;
             elseif ($target_source === 'Postgres') $target_conn = $pg_conn;
-            elseif ($target_source === 'SQLServer') $target_conn = $pdo_sqlsrv;
+            elseif ($target_source === 'SQLServer') $target_conn = $pdo;
 
            // C. SYNC PHARMACIST TO TARGET DB
 $sqlPharmacistId = null;
