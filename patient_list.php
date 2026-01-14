@@ -1,6 +1,10 @@
 <?php
 require_once "auth_check.php";
-requireRole('admin');
+// Allow both admin and pharmacist
+if (!hasAnyRole(['admin', 'pharmacist'])) {
+    header('Location: dashboard.php?error=unauthorized');
+    exit;
+}
 
 require_once 'connection.php';
 
@@ -123,6 +127,9 @@ if (isset($pdo_sqlsrv) && $pdo_sqlsrv instanceof PDO) {
         }
     } catch (Exception $e) { }
 }
+
+// Function to check if user can delete patients (admin only)
+$canDelete = ($_SESSION['role'] ?? '') === 'admin';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -924,11 +931,17 @@ if (isset($pdo_sqlsrv) && $pdo_sqlsrv instanceof PDO) {
                                             <i class="fas fa-lock"></i> In Use (<?php echo (int)$p['in_use']; ?>)
                                         </span>
                                     <?php else: ?>
+                                        <?php if ($canDelete): ?>
                                         <a href="delete_patient.php?id=<?php echo (int)$p['patient_id']; ?>&db=<?php echo urlencode($p['source']); ?>"
                                            onclick="return confirm('Delete this patient from <?php echo htmlspecialchars($p['source']); ?> database? This action cannot be undone.');"
                                            class="action-link link-delete">
                                             <i class="fas fa-trash"></i> Delete
                                         </a>
+                                        <?php else: ?>
+                                        <span style="color: var(--text-secondary); font-size: 0.85em; font-style: italic;">
+                                            <i class="fas fa-lock"></i> Admin only
+                                        </span>
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </td>
                             </tr>
