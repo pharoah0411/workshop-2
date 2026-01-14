@@ -13,73 +13,91 @@ if ($id <= 0 || empty($source)) {
     exit;
 }
 
-// Force password reset check
-if (!empty($_SESSION['force_reset'])) {
-    header("Location: reset_password.php");
-    exit;
-}
-
-// Select Connection
+// Select Connection for the Prescription Target
 $conn = null;
 if ($source === 'MySQL') $conn = $mysql_conn2;
 elseif ($source === 'Postgres') $conn = $pg_conn;
-elseif ($source === 'SQLServer') $conn = $pdo_sqlsrv; // Updated to match your connection
+elseif ($source === 'SQLServer') $conn = $pdo_sqlsrv;
 
 if (!$conn) die("Connection to $source failed.");
 
-// Helper: Parse Dosage "Choice (Custom)"
-function parseDosage($string) {
-    $parts = ['choice' => '1 Tablet', 'custom' => ''];
-    if (preg_match('/^(.*) \((.*)\)$/', $string, $matches)) {
-        $parts['choice'] = $matches[1];
-        $parts['custom'] = $matches[2];
+/**
+ * HELPER: Resolve Medicine ID in the Target Database
+ * If the medicine exists by name, return its local ID.
+ * If not, insert it and return the new ID.
+ */
+function resolveMedicineId($conn, $source, $medicineName) {
+    if (empty($medicineName)) return 0;
+    
+    // 1. Search for existing medicine by name
+    $sqlCheck = "SELECT MEDICINE_ID FROM MEDICINE WHERE NAME = ?";
+    $existingId = 0;
+
+    if ($source === 'MySQL') {
+        $stmt = $conn->prepare($sqlCheck);
+        $stmt->bind_param("s", $medicineName); $stmt->execute();
+        $res = $stmt->get_result()->fetch_assoc();
+        $existingId = $res['MEDICINE_ID'] ?? 0;
     } else {
-        $parts['custom'] = $string; // Fallback
+        $stmt = $conn->prepare($sqlCheck); $stmt->execute([$medicineName]);
+        $res = $stmt->fetch(PDO::FETCH_ASSOC);
+        $existingId = $res['MEDICINE_ID'] ?? $res['medicine_id'] ?? 0;
     }
-    return $parts;
+
+    if ($existingId > 0) return $existingId;
+
+    // 2. If not found, insert as a new medicine record in the target DB
+    $sqlIns = "INSERT INTO MEDICINE (NAME, DESCRIPTION, PRICE) VALUES (?, 'Imported from other source', 0.00)";
+    if ($source === 'MySQL') {
+        $stmt = $conn->prepare($sqlIns);
+        $stmt->bind_param("s", $medicineName); $stmt->execute();
+        return $conn->insert_id;
+    } else {
+        $conn->prepare($sqlIns)->execute([$medicineName]);
+        return $conn->lastInsertId();
+    }
 }
 
-// Helper: Parse Instruction "Morning, Night - 1x Daily"
-function parseInstruction($string) {
-    $parts = ['timing' => [], 'freq' => '1x Daily'];
-    $main = explode(' - ', $string);
-    if (count($main) > 0) $parts['timing'] = explode(', ', $main[0]);
-    if (count($main) > 1) $parts['freq'] = $main[1];
-    return $parts;
-}
+// ... (Keep your existing parseDosage and parseInstruction functions) ...
 
 $pres = null;
 $items = [];
 $medicines = [];
 
 try {
-    // 1. Fetch Header & Patient (Explicit columns to avoid naming collisions)
-    $sqlH = "SELECT pr.STATUS, pr.DATE_ISSUED, p.NAME AS PATIENT_NAME 
-             FROM PRESCRIPTION pr 
-             JOIN PATIENT p ON pr.PATIENT_ID = p.PATIENT_ID 
-             WHERE pr.PRESCRIPTION_ID = ?";
-             
+    // 1. Fetch Header & Current Items (Existing Logic)
+    $sqlH = "SELECT pr.STATUS, pr.DATE_ISSUED, p.NAME AS PATIENT_NAME FROM PRESCRIPTION pr JOIN PATIENT p ON pr.PATIENT_ID = p.PATIENT_ID WHERE pr.PRESCRIPTION_ID = ?";
     if ($source === 'MySQL') {
-        $stmt = $conn->prepare($sqlH);
-        $stmt->bind_param("i", $id); $stmt->execute();
+        $stmt = $conn->prepare($sqlH); $stmt->bind_param("i", $id); $stmt->execute();
         $pres = $stmt->get_result()->fetch_assoc();
     } else {
         $stmt = $conn->prepare($sqlH); $stmt->execute([$id]);
         $pres = $stmt->fetch(PDO::FETCH_ASSOC);
     }
-    
-    if (!$pres) die("Prescription #$id not found in $source.");
-    $pres = array_change_key_case($pres, CASE_UPPER); // Standardize keys to uppercase
+    $pres = array_change_key_case($pres, CASE_UPPER);
 
-    // 2. Fetch Prescription Items
-    $sqlD = "SELECT pd.MEDICINE_ID, pd.DOSAGE, pd.QUANTITY, pd.INSTRUCTION, m.NAME AS MED_NAME 
-             FROM PRESCRIPTION_DETAIL pd 
-             JOIN MEDICINE m ON pd.MEDICINE_ID = m.MEDICINE_ID 
-             WHERE pd.PRESCRIPTION_ID = ?";
-             
+    // 2. Fetch Global Medicine List (Store Name as well as ID)
+    $sqlM = "SELECT MEDICINE_ID, NAME FROM MEDICINE ORDER BY NAME";
+    $uniqueMeds = [];
+    foreach ([$mysql_conn2, $pg_conn, $pdo_sqlsrv] as $c) {
+        if (!$c) continue;
+        if ($c instanceof mysqli) {
+            $res = $c->query($sqlM);
+            while($r = $res ? $res->fetch_assoc() : null) $uniqueMeds[$r['NAME']] = $r['NAME'];
+        } else {
+            $stmt = $c->query($sqlM);
+            while($r = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null) {
+                $name = $r['NAME'] ?? $r['name'];
+                $uniqueMeds[$name] = $name;
+            }
+        }
+    }
+    asort($uniqueMeds);
+    
+    // Fetch Current Details
+    $sqlD = "SELECT pd.DOSAGE, pd.QUANTITY, pd.INSTRUCTION, m.NAME AS MED_NAME FROM PRESCRIPTION_DETAIL pd JOIN MEDICINE m ON pd.MEDICINE_ID = m.MEDICINE_ID WHERE pd.PRESCRIPTION_ID = ?";
     if ($source === 'MySQL') {
-        $stmt = $conn->prepare($sqlD);
-        $stmt->bind_param("i", $id); $stmt->execute();
+        $stmt = $conn->prepare($sqlD); $stmt->bind_param("i", $id); $stmt->execute();
         $resD = $stmt->get_result();
         while($r = $resD->fetch_assoc()) $items[] = array_change_key_case($r, CASE_UPPER);
     } else {
@@ -87,57 +105,49 @@ try {
         while($r = $stmt->fetch(PDO::FETCH_ASSOC)) $items[] = array_change_key_case($r, CASE_UPPER);
     }
 
-    // 3. Fetch All Medicines for Dropdowns
-    $sqlM = "SELECT MEDICINE_ID, NAME FROM MEDICINE ORDER BY NAME";
-    if ($source === 'MySQL') {
-        $resM = $conn->query($sqlM);
-        while($r = $resM->fetch_assoc()) $medicines[] = array_change_key_case($r, CASE_UPPER);
-    } else {
-        $stmtM = $conn->query($sqlM);
-        while($r = $stmtM->fetch(PDO::FETCH_ASSOC)) $medicines[] = array_change_key_case($r, CASE_UPPER);
-    }
 } catch (Exception $e) { $error = "Fetch Error: " . $e->getMessage(); }
 
-// Handle Update
+// 3. Handle Update with Resolution
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = $_POST['status'];
     $form_items = $_POST['meds'] ?? [];
 
     try {
+        if ($source === 'MySQL') $conn->begin_transaction(); else $conn->beginTransaction();
+
+        // Update Status
         if ($source === 'MySQL') {
-            $conn->begin_transaction();
-            // MySQLi Update
-            $stmtUpd = $conn->prepare("UPDATE PRESCRIPTION SET STATUS=? WHERE PRESCRIPTION_ID=?");
-            $stmtUpd->bind_param("si", $status, $id); $stmtUpd->execute();
-            
-            $conn->query("DELETE FROM PRESCRIPTION_DETAIL WHERE PRESCRIPTION_ID=$id");
-
-            foreach ($form_items as $item) {
-                $dose = ($item['dose_choice'] ?? '') . " (" . ($item['dose_custom'] ?? 'Std') . ")";
-                $instr = implode(", ", $item['timing'] ?? []) . " - " . ($item['instr_freq'] ?? '');
-                $qty = intval($item['qty'] ?? 1);
-                $mId = intval($item['med_id']);
-
-                $stmt = $conn->prepare("INSERT INTO PRESCRIPTION_DETAIL (PRESCRIPTION_ID, MEDICINE_ID, DOSAGE, QUANTITY, INSTRUCTION) VALUES (?,?,?,?,?)");
-                $stmt->bind_param("iisis", $id, $mId, $dose, $qty, $instr); $stmt->execute();
-            }
-            $conn->commit();
+            $stmt = $conn->prepare("UPDATE PRESCRIPTION SET STATUS=? WHERE PRESCRIPTION_ID=?");
+            $stmt->bind_param("si", $status, $id); $stmt->execute();
         } else {
-            $conn->beginTransaction();
             $conn->prepare("UPDATE PRESCRIPTION SET STATUS=? WHERE PRESCRIPTION_ID=?")->execute([$status, $id]);
-            $conn->prepare("DELETE FROM PRESCRIPTION_DETAIL WHERE PRESCRIPTION_ID=?")->execute([$id]);
+        }
+        
+        // Clear old details
+        $delSql = "DELETE FROM PRESCRIPTION_DETAIL WHERE PRESCRIPTION_ID = " . $id;
+        ($source === 'MySQL') ? $conn->query($delSql) : $conn->exec($delSql);
 
-            foreach ($form_items as $item) {
+        foreach ($form_items as $item) {
+            $medName = $item['med_name'] ?? '';
+            // RESOLVE: Find or create the medicine in the local database
+            $localMedId = resolveMedicineId($conn, $source, $medName);
+
+            if ($localMedId > 0) {
                 $dose = ($item['dose_choice'] ?? '') . " (" . ($item['dose_custom'] ?? 'Std') . ")";
                 $instr = implode(", ", $item['timing'] ?? []) . " - " . ($item['instr_freq'] ?? '');
                 $qty = intval($item['qty'] ?? 1);
-                $mId = intval($item['med_id']);
 
-                $conn->prepare("INSERT INTO PRESCRIPTION_DETAIL (PRESCRIPTION_ID, MEDICINE_ID, DOSAGE, QUANTITY, INSTRUCTION) VALUES (?,?,?,?,?)")
-                     ->execute([$id, $mId, $dose, $qty, $instr]);
+                if ($source === 'MySQL') {
+                    $stmt = $conn->prepare("INSERT INTO PRESCRIPTION_DETAIL (PRESCRIPTION_ID, MEDICINE_ID, DOSAGE, QUANTITY, INSTRUCTION) VALUES (?,?,?,?,?)");
+                    $stmt->bind_param("iisis", $id, $localMedId, $dose, $qty, $instr); $stmt->execute();
+                } else {
+                    $conn->prepare("INSERT INTO PRESCRIPTION_DETAIL (PRESCRIPTION_ID, MEDICINE_ID, DOSAGE, QUANTITY, INSTRUCTION) VALUES (?,?,?,?,?)")
+                         ->execute([$id, $localMedId, $dose, $qty, $instr]);
+                }
             }
-            $conn->commit();
         }
+        
+        if ($source === 'MySQL') $conn->commit(); else $conn->commit();
         header("Location: prescriptionDashboard.php?success=1");
         exit;
     } catch(Exception $e){

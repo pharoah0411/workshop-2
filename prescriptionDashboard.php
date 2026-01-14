@@ -1001,14 +1001,26 @@ usort($prescriptions, function($a, $b) {
 
                 <!-- Action Buttons and Search -->
                 <div class="action-buttons">
-                    <a href="createPrescription.php" class="btn-primary">
-                        <i class="fas fa-plus"></i> New Prescription
-                    </a>
-                    
-                    <a href="export_prescription.php" class="btn-secondary">
-                        <i class="fas fa-file-export"></i> Export Prescriptions
-                    </a>
-                </div>
+    <?php 
+    // Convert to lowercase to avoid case-sensitivity issues
+    $currentRole = strtolower($role); 
+    
+    if ($currentRole === 'pharmacist'): ?>
+        <a href="createPrescription.php" class="btn-primary">
+            <i class="fas fa-plus"></i> New Prescription
+        </a>
+    <?php else: ?>
+        <a href="javascript:void(0);" class="btn-primary" 
+           style="opacity: 0.6; cursor: not-allowed; pointer-events: none; background: #6c757d; border-color: #6c757d;" 
+           title="Only Pharmacists can create new prescriptions">
+            <i class="fas fa-plus"></i> New Prescription (Pharmacist Only)
+        </a>
+    <?php endif; ?>
+    
+    <a href="export_prescription.php" class="btn-secondary">
+        <i class="fas fa-file-export"></i> Export Prescriptions
+    </a>
+</div>
 
                 <!-- Search and Filter -->
                 <form method="GET" class="search-filter-container">
@@ -1072,35 +1084,46 @@ usort($prescriptions, function($a, $b) {
                                     </td>
                                     <td>
                                         <div class="table-actions">
-                                            <a href="viewPrescription.php?id=<?php echo $p['PRESCRIPTION_ID']; ?>&source=<?php echo $src; ?>" class="table-btn btn-view" title="View">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            <a href="printLabel.php?id=<?php echo $p['PRESCRIPTION_ID']; ?>&source=<?php echo $src; ?>" class="table-btn btn-print" title="Print">
-                                                <i class="fas fa-print"></i>
-                                            </a>
-                                            <a href="editPrescription.php?id=<?php echo $p['PRESCRIPTION_ID']; ?>&source=<?php echo $src; ?>" class="table-btn btn-edit" title="Edit">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <?php if(strtolower($p['STATUS']) === 'pending'): ?>
-                                            <form method="POST" style="display:inline;">
-                                                <input type="hidden" name="action" value="update_status">
-                                                <input type="hidden" name="prescription_id" value="<?php echo $p['PRESCRIPTION_ID']; ?>">
-                                                <input type="hidden" name="source" value="<?php echo $src; ?>">
-                                                <input type="hidden" name="status" value="Completed">
-                                                <button type="submit" class="btn-done" onclick="return confirm('Mark prescription #<?php echo $p['PRESCRIPTION_ID']; ?> as Completed?')">
-                                                    Done
-                                                </button>
-                                            </form>
-                                            <?php endif; ?>
-                                            <form method="POST" style="display:inline;">
-                                                <input type="hidden" name="action" value="delete_prescription">
-                                                <input type="hidden" name="prescription_id" value="<?php echo $p['PRESCRIPTION_ID']; ?>">
-                                                <input type="hidden" name="source" value="<?php echo $src; ?>">
-                                                <button type="submit" class="btn-delete" onclick="return confirm('Delete prescription #<?php echo $p['PRESCRIPTION_ID']; ?>? This cannot be undone!')">
-                                                    <i class="fas fa-trash-alt"></i>
-                                                </button>
-                                            </form>
-                                        </div>
+                                          <a href="viewPrescription.php?id=<?php echo $p['PRESCRIPTION_ID']; ?>&source=<?php echo $src; ?>" class="table-btn btn-view" title="View">
+                                              <i class="fas fa-eye"></i>
+                                         </a>
+
+                                             <a href="printLabel.php?id=<?php echo $p['PRESCRIPTION_ID']; ?>&source=<?php echo $src; ?>" class="table-btn btn-print" title="Print">
+                                                 <i class="fas fa-print"></i>
+                                             </a>
+
+    <?php if (strtolower($role) === 'admin'): ?>
+        <a href="javascript:void(0);" class="table-btn btn-edit" title="Edit Disabled for Admin" 
+           style="opacity: 0.5; cursor: not-allowed; pointer-events: none; filter: grayscale(1);">
+            <i class="fas fa-edit"></i>
+        </a>
+    <?php else: ?>
+        <a href="editPrescription.php?id=<?php echo $p['PRESCRIPTION_ID']; ?>&source=<?php echo $src; ?>" class="table-btn btn-edit" title="Edit">
+            <i class="fas fa-edit"></i>
+        </a>
+    <?php endif; ?>
+
+    <?php if(strtolower($p['STATUS'] ?? '') === 'pending'): ?>
+    <form method="POST" style="display:inline;">
+        <input type="hidden" name="action" value="update_status">
+        <input type="hidden" name="prescription_id" value="<?php echo $p['PRESCRIPTION_ID']; ?>">
+        <input type="hidden" name="source" value="<?php echo $src; ?>">
+        <input type="hidden" name="status" value="Completed">
+        <button type="submit" class="btn-done" onclick="return confirm('Mark prescription #<?php echo $p['PRESCRIPTION_ID']; ?> as Completed?')">
+            Done
+        </button>
+    </form>
+    <?php endif; ?>
+
+    <form method="POST" style="display:inline;">
+        <input type="hidden" name="action" value="delete_prescription">
+        <input type="hidden" name="prescription_id" value="<?php echo $p['PRESCRIPTION_ID']; ?>">
+        <input type="hidden" name="source" value="<?php echo $src; ?>">
+        <button type="submit" class="btn-delete" onclick="return confirm('Delete prescription #<?php echo $p['PRESCRIPTION_ID']; ?>? This cannot be undone!')">
+            <i class="fas fa-trash-alt"></i>
+        </button>
+    </form>
+</div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>

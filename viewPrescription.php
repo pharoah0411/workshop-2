@@ -892,7 +892,7 @@ if ($id > 0) {
                             <button onclick="window.print()" class="btn btn-print">
                                 <i class="fas fa-print"></i> Print Record
                             </button>
-                            <a href="edit_prescription.php?id=<?php echo $id; ?>&source=<?php echo $source; ?>" class="btn btn-primary">
+                            <a href="editprescription.php?id=<?php echo $id; ?>&source=<?php echo $source; ?>" class="btn btn-primary">
                                 <i class="fas fa-edit"></i> Edit Prescription
                             </a>
                         </div>

@@ -633,6 +633,7 @@ $username = $_SESSION['username'] ?? 'User';
                 <div class="nav-section">
                     <div class="nav-title">Medical Operations</div>
                     <ul class="nav-links">
+                        <li><a href="dashboard.php" class="active"><i class="fas fa-pills nav-icon"></i>Dashboard</a></li>
                         <li><a href="medDirectory.php" class="active"><i class="fas fa-pills nav-icon"></i>Medicine Inventory</a></li>
                         <li><a href="prescriptionDashboard.php"><i class="fas fa-prescription nav-icon"></i>Prescriptions</a></li>
                         <li><a href="Sales_Billing.php"><i class="fas fa-cash-register nav-icon"></i>Sales & Billing</a></li>
