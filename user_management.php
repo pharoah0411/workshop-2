@@ -547,7 +547,7 @@ $userRole = $_SESSION['role'] ?? 'Admin';
                     <div class="nav-title">Administration</div>
                     <ul class="nav-links">
                         <li><a href="user_management.php" class="active"><i class="fas fa-users nav-icon"></i>User Management</a></li>
-                        <li><a href="reports.php"><i class="fas fa-chart-bar nav-icon"></i>Reports & Analytics</a></li>
+                        <li><a href="reports.php"><i class="fas fa-chart-bar nav-icon"></i>Reports</a></li>
                         <li><a href="backup.php"><i class="fas fa-database nav-icon"></i>Backup & Restore</a></li>
                     </ul>
                 </div>

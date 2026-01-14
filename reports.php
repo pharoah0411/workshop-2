@@ -1653,7 +1653,7 @@ if (isset($_POST['export_excel'])) {
                     <div class="nav-title">Administration</div>
                     <ul class="nav-links">
                         <li><a href="user_management.php"><i class="fas fa-users nav-icon"></i>User Management</a></li>
-                        <li><a href="reports.php" class="active"><i class="fas fa-chart-bar nav-icon"></i>Reports & Analytics</a></li>
+                        <li><a href="reports.php" class="active"><i class="fas fa-chart-bar nav-icon"></i>Reports</a></li>
                         <li><a href="backup.php"><i class="fas fa-database nav-icon"></i>Backup & Restore</a></li>
                     </ul>
                 </div>
@@ -1668,7 +1668,7 @@ if (isset($_POST['export_excel'])) {
         <main class="main-content">
             <header class="main-header">
                 <div class="header-title">
-                    <h1>Reports & Analytics</h1>
+                    <h1>Reports</h1>
                     <p>Pharmacy Performance Dashboard - <?php echo date('l, F j, Y'); ?></p>
                 </div>
                 <div class="header-actions">
@@ -1684,11 +1684,6 @@ if (isset($_POST['export_excel'])) {
                                 <i class="fas fa-file-excel"></i> Export Excel
                             </button>
                         </form>
-                    </div>
-                    
-                    <div class="search-box">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" placeholder="Search reports...">
                     </div>
                 </div>
             </header>

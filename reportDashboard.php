@@ -225,7 +225,7 @@ if ($db) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pharmacy Reports & Analytics</title>
+    <title>Pharmacy Reports</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -505,7 +505,7 @@ if ($db) {
                 <li><a href="prescriptionDashboard.php"><i>📋</i> <span>Prescriptions</span></a></li>
                 <li><a href="sales_billing.php"><i>💰</i> <span>Sales & Billing</span></a></li>
                 <li><a href="user_management.php"><i>👥</i> <span>User Management</span></a></li>
-                <li><a href="reports.php" class="active"><i>📈</i> <span>Reports & Analytics</span></a></li>
+                <li><a href="reports.php" class="active"><i>📈</i> <span>Reports</span></a></li>
             </ul>
             
             <button class="logout-btn" onclick="window.location.href='logout.php'">
@@ -516,7 +516,7 @@ if ($db) {
         <div class="main-content">
             <div class="header">
                 <div>
-                    <h1><i>📈</i> Reports & Analytics</h1>
+                    <h1><i>📈</i> Reports</h1>
                     <div class="db-info">
                         Connected to: <strong><?php echo strtoupper($db_type); ?> Database</strong>
                     </div>
