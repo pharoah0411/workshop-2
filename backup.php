@@ -1,5 +1,10 @@
 <?php
 session_start();
+
+// ⭐⭐⭐ FIX: SET TIMEZONE TO MATCH YOUR LOCAL TIME ⭐⭐⭐
+date_default_timezone_set('Asia/Kuala_Lumpur'); // Change to your timezone
+// Options: 'Asia/Singapore', 'Asia/Manila', 'Asia/Jakarta', 'UTC', etc.
+
 require_once 'session_check.php'; // Add session check like other pages
 require_once 'connection.php';
 
@@ -168,7 +173,8 @@ function createDatabaseBackup($db_type) {
                              Database: " . strtoupper($db_type) . "<br>
                              Size: " . filesize($backup_file) . " bytes<br>
                              Tables: " . count($tables) . "<br>
-                             Records: " . $total_records,
+                             Records: " . $total_records . "<br>
+                             Time: " . date('H:i:s'),
                 'file' => basename($backup_file),
                 'db_type' => $db_type
             ];
@@ -323,7 +329,8 @@ function createExcelBackup($db_type) {
                          Database: " . strtoupper($db_type) . "<br>
                          Size: " . filesize($zip_file) . " bytes<br>
                          Tables: " . count($tables) . "<br>
-                         Records: " . $total_records,
+                         Records: " . $total_records . "<br>
+                         Time: " . date('H:i:s'),
             'file' => basename($zip_file),
             'db_type' => $db_type
         ];
@@ -1540,7 +1547,7 @@ foreach ($backup_files as $file) {
             <header class="main-header">
                 <div class="header-title">
                     <h1>Backup & Restore</h1>
-                    <p>Manage database backups and restorations - <?php echo date('l, F j, Y'); ?></p>
+                    <p>Manage database backups and restorations - <?php echo date('l, F j, Y H:i:s'); ?></p>
                 </div>
                 <div class="header-actions">
                     <div class="search-box">
