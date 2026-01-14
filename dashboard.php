@@ -439,72 +439,6 @@ if ($postgresql_connected) $connected_dbs++;
             font-weight: 300;
         }
 
-        /* Important Notices */
-        .notices-section {
-            margin-bottom: 30px;
-        }
-
-        .section-title {
-            font-size: 1.2em;
-            color: var(--dark-blue);
-            margin-bottom: 15px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .notices-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 15px;
-        }
-
-        .notice-card {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 10px;
-            border-left: 4px solid var(--dark-blue);
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
-            transition: transform 0.2s ease;
-        }
-
-        .notice-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-        }
-
-        .notice-card.urgent {
-            border-left-color: var(--alert-red);
-        }
-
-        .notice-card.warning {
-            border-left-color: var(--warning-orange);
-        }
-
-        .notice-title {
-            font-size: 1em;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .notice-content {
-            color: var(--text-secondary);
-            margin-bottom: 12px;
-            line-height: 1.5;
-            font-size: 0.9em;
-        }
-
-        .notice-date {
-            font-size: 0.8em;
-            color: var(--dark-blue);
-            font-weight: 500;
-        }
-
         /* System Status Grid */
         .status-grid {
             display: grid;
@@ -582,6 +516,7 @@ if ($postgresql_connected) $connected_dbs++;
             padding: 25px;
             border-radius: 10px;
             border: 1px solid var(--border-color);
+            margin-bottom: 30px;
         }
 
         .activity-list {
@@ -624,6 +559,21 @@ if ($postgresql_connected) $connected_dbs++;
             color: var(--text-secondary);
             font-size: 0.8em;
             font-weight: 300;
+        }
+
+        /* System Status Section */
+        .system-status-section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.2em;
+            color: var(--dark-blue);
+            margin-bottom: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         /* Responsive Design */
@@ -676,7 +626,6 @@ if ($postgresql_connected) $connected_dbs++;
                 width: 100%;
             }
             
-            .notices-grid,
             .status-grid,
             .quick-stats {
                 grid-template-columns: 1fr;
@@ -737,7 +686,6 @@ if ($postgresql_connected) $connected_dbs++;
                 <div class="nav-section">
                     <div class="nav-title">NAVIGATION</div>
                     <ul class="nav-links">
-                        <!-- Using your friend's preferred pills icon -->
                         <li><a href="dashboard.php" class="active"><i class="fas fa-pills nav-icon"></i>Dashboard</a></li>
                         <li><a href="medDirectory.php"><i class="fas fa-pills nav-icon"></i>Medicine Inventory</a></li>
                         <li><a href="prescriptionDashboard.php"><i class="fas fa-prescription nav-icon"></i>Prescriptions</a></li>
@@ -804,59 +752,8 @@ if ($postgresql_connected) $connected_dbs++;
                     </div>
                 </div>
 
-                <!-- Important Notices -->
-                <section class="notices-section">
-                    <h2 class="section-title"><i class="fas fa-bell"></i> Important Notices</h2>
-                    <div class="notices-grid">
-                        <!-- Low Stock Notice -->
-                        <div class="notice-card <?php echo ($stats['low_stock_count'] > 0) ? 'urgent' : ''; ?>">
-                            <div class="notice-title">
-                                <i class="fas <?php echo ($stats['low_stock_count'] > 0) ? 'fa-exclamation-triangle' : 'fa-check-circle'; ?>"></i> 
-                                <?php echo ($stats['low_stock_count'] > 0) ? 'Low Stock Alert' : 'Stock Levels Normal'; ?>
-                            </div>
-                            <div class="notice-content">
-                                <?php if ($stats['low_stock_count'] > 0): ?>
-                                    <strong><?php echo $stats['low_stock_count']; ?> medicine(s) running low (≤50 items):</strong><br>
-                                    <?php foreach ($stats['low_stock_medicines'] as $medicine): ?>
-                                        • <?php echo htmlspecialchars($medicine['medicine_name']); ?> 
-                                        <span style="color: var(--alert-red); font-weight: bold;">
-                                            (<?php echo $medicine['quantity']; ?> left)
-                                        </span><br>
-                                    <?php endforeach; ?>
-                                    <?php if (count($stats['low_stock_medicines']) < $stats['low_stock_count']): ?>
-                                        <br>... and <?php echo ($stats['low_stock_count'] - count($stats['low_stock_medicines'])); ?> more medicine(s) with low stock
-                                    <?php endif; ?>
-                                <?php else: ?>
-                                    All medicines are sufficiently stocked. No medicines with 50 or fewer items.
-                                <?php endif; ?>
-                            </div>
-                            <div class="notice-date">Updated <?php echo date('h:i A'); ?></div>
-                        </div>
-                        
-                        <!-- System Status Notice -->
-                        <div class="notice-card">
-                            <div class="notice-title">
-                                <i class="fas fa-database"></i> 
-                                Database Status
-                            </div>
-                            <div class="notice-content">
-                                <strong>Connected Databases:</strong><br>
-                                • MySQL: <?php echo $mysql_connected ? '✅ Connected' : '❌ Disconnected'; ?><br>
-                                • SQL Server: <?php echo $sqlserver_connected ? '✅ Connected' : '❌ Disconnected'; ?><br>
-                                • PostgreSQL: <?php echo $postgresql_connected ? '✅ Connected' : '❌ Disconnected'; ?>
-                                <br><br>
-                                <strong>Data Summary:</strong><br>
-                                • <?php echo $stats['medicine_count']; ?> medicines in database<br>
-                                • <?php echo $stats['total_patients']; ?> patients registered<br>
-                                • <?php echo $stats['pending_prescriptions']; ?> prescriptions pending
-                            </div>
-                            <div class="notice-date">Checked just now</div>
-                        </div>
-                    </div>
-                </section>
-
                 <!-- System Status -->
-                <section class="notices-section">
+                <section class="system-status-section">
                     <h2 class="section-title"><i class="fas fa-heartbeat"></i> System Status</h2>
                     <div class="status-grid">
                         <div class="status-card">
