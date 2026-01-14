@@ -771,7 +771,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="nav-title">ADMINISTRATION</div>
                     <ul class="nav-links">
                         <li><a href="user_management.php"><i class="fas fa-users nav-icon"></i>User Management</a></li>
-                        <li><a href="patient_management.php" class="active"><i class="fas fa-user-injured nav-icon"></i>Patient Management</a></li>
+                        <li><a href="add_patient.php" class="active"><i class="fas fa-user-plus nav-icon"></i>Add Patient</a></li>
                         <li><a href="reports.php"><i class="fas fa-chart-bar nav-icon"></i>Reports</a></li>
                         <li><a href="backup.php"><i class="fas fa-database nav-icon"></i>Backup & Restore</a></li>
                     </ul>
@@ -798,8 +798,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <p>Register new patient records in the system</p>
                 </div>
                 <div class="header-actions">
-                    <a href="patient_management.php" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Patients
+                    <!-- FIXED: Changed from patient_management.php to user_management.php -->
+                    <a href="user_management.php" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to User Management
                     </a>
                 </div>
             </header>
@@ -927,7 +928,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-user-plus"></i> Add Patient
                                 </button>
-                                <a href="patient_management.php" class="btn btn-secondary">
+                                <!-- FIXED: Changed from patient_management.php to user_management.php -->
+                                <a href="user_management.php" class="btn btn-secondary">
                                     <i class="fas fa-times"></i> Cancel
                                 </a>
                             </div>
@@ -944,7 +946,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const currentPage = window.location.pathname.split('/').pop();
             document.querySelectorAll('.nav-links a').forEach(link => {
                 link.classList.remove('active');
-                if (link.getAttribute('href') === 'patient_management.php') {
+                if (link.getAttribute('href') === currentPage) {
                     link.classList.add('active');
                 }
             });
