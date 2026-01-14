@@ -1,22 +1,10 @@
 <?php
+// Use ONLY auth_check.php like before
 require_once "auth_check.php";
 requireRole('admin');
-require_once "session_check.php";
+
 require_once "connection.php";
-
-// Check login
-if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
-}
-
-if (!empty($_SESSION['force_reset'])) {
-    header("Location: reset_password.php");
-    exit;
-}
-
-$userRole = $_SESSION['role'] ?? 'Guest';
-$username = $_SESSION['username'] ?? 'User';
+// REMOVE: include "header.php"; // Don't use this old header
 
 $message = "";
 
@@ -44,21 +32,24 @@ try {
     ========================= */
     if ($db === "Postgres" && isset($pg_conn) && $pg_conn instanceof PDO) {
 
+        // patient name is inside patient table in your latest design
         $stmt = $pg_conn->prepare('SELECT patient_id, name FROM patient WHERE patient_id = ?');
         $stmt->execute([$patient_id]);
         $patient = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$patient) die("<p style='color:red;'>Patient not found in Postgres.</p><a href='patient_list.php'>Back</a>");
 
+        // Add new history
         if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $description = trim($_POST["description"] ?? '');
             if ($description !== "") {
                 $ins = $pg_conn->prepare('INSERT INTO medical_history (patient_id, description) VALUES (?, ?)');
                 $ins->execute([$patient_id, $description]);
-                $message = "<div class='success-message'>New history record added!</div>";
+                $message = "<div class='success-message'><i class='fas fa-check-circle'></i> New history record added!</div>";
             }
         }
 
+        // Fetch history list
         $stmtH = $pg_conn->prepare('SELECT history_id, description FROM medical_history WHERE patient_id = ? ORDER BY history_id DESC');
         $stmtH->execute([$patient_id]);
         $historyList = $stmtH->fetchAll(PDO::FETCH_ASSOC);
@@ -69,6 +60,7 @@ try {
     ========================= */
     elseif ($db === "MySQL" && isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) {
 
+        // patient name is inside PATIENT table
         $stmt = $mysql_conn2->prepare("SELECT PATIENT_ID, NAME FROM PATIENT WHERE PATIENT_ID = ?");
         $stmt->bind_param("i", $patient_id);
         $stmt->execute();
@@ -78,6 +70,7 @@ try {
 
         if (!$patient) die("<p style='color:red;'>Patient not found in MySQL.</p><a href='patient_list.php'>Back</a>");
 
+        // Add new history
         if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $description = trim($_POST["description"] ?? '');
             if ($description !== "") {
@@ -85,10 +78,11 @@ try {
                 $ins->bind_param("is", $patient_id, $description);
                 $ins->execute();
                 $ins->close();
-                $message = "<div class='success-message'>New history record added!</div>";
+                $message = "<div class='success-message'><i class='fas fa-check-circle'></i> New history record added!</div>";
             }
         }
 
+        // Fetch history list
         $stmtH = $mysql_conn2->prepare("SELECT HISTORY_ID, DESCRIPTION FROM MEDICAL_HISTORY WHERE PATIENT_ID = ? ORDER BY HISTORY_ID DESC");
         $stmtH->bind_param("i", $patient_id);
         $stmtH->execute();
@@ -107,15 +101,17 @@ try {
 
         if (!$patient) die("<p style='color:red;'>Patient not found in SQL Server.</p><a href='patient_list.php'>Back</a>");
 
+        // Add new history
         if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $description = trim($_POST["description"] ?? '');
             if ($description !== "") {
                 $ins = $pdo->prepare("INSERT INTO medical_history (patient_id, description) VALUES (?, ?)");
                 $ins->execute([$patient_id, $description]);
-                $message = "<div class='success-message'>New history record added!</div>";
+                $message = "<div class='success-message'><i class='fas fa-check-circle'></i> New history record added!</div>";
             }
         }
 
+        // Fetch history list
         $stmtH = $pdo->prepare("SELECT history_id, description FROM medical_history WHERE patient_id = ? ORDER BY history_id DESC");
         $stmtH->execute([$patient_id]);
         $historyList = $stmtH->fetchAll(PDO::FETCH_ASSOC);
@@ -129,8 +125,10 @@ try {
     die("<p style='color:red;'>System error: " . htmlspecialchars($e->getMessage()) . "</p><a href='patient_list.php'>Back</a>");
 }
 
+// Normalize name key (MySQL uses NAME)
 $patientName = $patient['name'] ?? $patient['NAME'] ?? 'Patient';
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -140,6 +138,7 @@ $patientName = $patient['name'] ?? $patient['NAME'] ?? 'Patient';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
     <style>
+        /* EXACT SAME CSS STYLING FROM BEFORE - KEEP EVERYTHING BELOW THIS LINE */
         /* Medical Professional Color Scheme with Dark Blue */
         :root {
             --dark-blue: #1c4966;
@@ -726,7 +725,13 @@ $patientName = $patient['name'] ?? $patient['NAME'] ?? 'Patient';
 
             <div class="user-profile">
                 <div class="user-avatar">
-                    <?php echo strtoupper(substr($username, 0, 2)); ?>
+                    <?php 
+                    // Get session variables directly from auth_check.php
+                    require_once "auth_check.php";
+                    $username = $_SESSION['username'] ?? 'User';
+                    $userRole = $_SESSION['role'] ?? 'Guest';
+                    echo strtoupper(substr($username, 0, 2)); 
+                    ?>
                 </div>
                 <div class="user-info">
                     <div class="user-name"><?php echo htmlspecialchars($username); ?></div>
