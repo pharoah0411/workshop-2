@@ -1530,7 +1530,7 @@ foreach ($backup_files as $file) {
                     <div class="nav-title">Administration</div>
                     <ul class="nav-links">
                         <li><a href="user_management.php"><i class="fas fa-users nav-icon"></i>User Management</a></li>
-                        <li><a href="reports.php"><i class="fas fa-chart-bar nav-icon"></i>Reports & Analytics</a></li>
+                        <li><a href="reports.php"><i class="fas fa-chart-bar nav-icon"></i>Reports </a></li>
                         <li><a href="backup.php" class="active"><i class="fas fa-database nav-icon"></i>Backup & Restore</a></li>
                     </ul>
                 </div>
@@ -1571,7 +1571,7 @@ foreach ($backup_files as $file) {
                     <a href="user_management.php"><i class="fas fa-users"></i> User Management</a>
                     <a href="medDirectory.php"><i class="fas fa-pills"></i> Medicine Inventory</a>
                     <a href="Sales_Billing.php"><i class="fas fa-cash-register"></i> Sales & Billing</a>
-                    <a href="reports.php"><i class="fas fa-chart-bar"></i> Reports & Analytics</a>
+                    <a href="reports.php"><i class="fas fa-chart-bar"></i> Reports </a>
                     <a href="backup.php" class="active"><i class="fas fa-database"></i> Backup & Restore</a>
                 </div>
 
