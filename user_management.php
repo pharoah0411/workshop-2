@@ -565,12 +565,6 @@ $userRole = $_SESSION['role'] ?? 'Admin';
                     <h1>User Management</h1>
                     <p>Manage users, patients, and permissions - <?php echo date('l, F j, Y'); ?></p>
                 </div>
-                <div class="header-actions">
-                    <div class="search-box">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" placeholder="Search users or patients...">
-                    </div>
-                </div>
             </header>
 
             <div class="content-wrapper">
@@ -581,16 +575,6 @@ $userRole = $_SESSION['role'] ?? 'Admin';
                         <p>Manage all user accounts, patients, and role permissions in one place</p>
                     </div>
                 </section>
-
-                <!-- System Navigation -->
-                <div class="system-nav">
-                    <a href="dashboard.php"><i class="fas fa-home"></i> Dashboard</a>
-                    <a href="user_management.php" class="active"><i class="fas fa-users"></i> User Management</a>
-                    <a href="medDirectory.php"><i class="fas fa-pills"></i> Medicine Inventory</a>
-                    <a href="Sales_Billing.php"><i class="fas fa-cash-register"></i> Sales & Billing</a>
-                    <a href="reports.php"><i class="fas fa-chart-bar"></i> Reports & Analytics</a>
-                    <a href="prescriptionDashboard.php"><i class="fas fa-prescription"></i> Prescriptions</a>
-                </div>
 
                 <!-- Module Sections -->
                 <div class="module-section">

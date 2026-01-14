@@ -913,13 +913,6 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
                         <li><a href="backup.php"><i class="fas fa-database nav-icon"></i>Backup & Restore</a></li>
                     </ul>
                 </div>
-
-                <div class="nav-section">
-                    <div class="nav-title">ACCOUNT</div>
-                    <ul class="nav-links">
-                        <li><a href="profile.php"><i class="fas fa-user-cog nav-icon"></i>Profile Settings</a></li>
-                    </ul>
-                </div>
             </nav>
 
             <button class="logout-btn" onclick="window.location.href='logout.php'">
@@ -933,12 +926,6 @@ $meds_to_display = array_filter($all_meds, function($m) use ($search_query, $fil
                 <div class="header-title">
                     <h1>Medicine Inventory</h1>
                     <p>Monitor stock levels and expiry dates across all databases</p>
-                </div>
-                <div class="header-actions">
-                    <div class="search-box">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" placeholder="Search by Medicine ID or Name..." id="searchInput" value="<?php echo htmlspecialchars($search_query); ?>">
-                    </div>
                 </div>
             </header>
 

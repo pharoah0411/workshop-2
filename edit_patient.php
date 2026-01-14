@@ -741,13 +741,6 @@ $username = $_SESSION['username'] ?? 'User';
                         <li><a href="backup.php"><i class="fas fa-database nav-icon"></i>Backup & Restore</a></li>
                     </ul>
                 </div>
-
-                <div class="nav-section">
-                    <div class="nav-title">ACCOUNT</div>
-                    <ul class="nav-links">
-                        <li><a href="profile.php"><i class="fas fa-user-cog nav-icon"></i>Profile Settings</a></li>
-                    </ul>
-                </div>
             </nav>
 
             <button class="logout-btn" onclick="window.location.href='logout.php'">

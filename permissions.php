@@ -947,13 +947,6 @@ $permDescriptions = [
                         <li><a href="role_management.php" class="active"><i class="fas fa-user-shield nav-icon"></i>Role Management</a></li>
                     </ul>
                 </div>
-
-                <div class="nav-section">
-                    <div class="nav-title">ACCOUNT</div>
-                    <ul class="nav-links">
-                        <li><a href="profile.php"><i class="fas fa-user-cog nav-icon"></i>Profile Settings</a></li>
-                    </ul>
-                </div>
             </nav>
 
             <button class="logout-btn" onclick="window.location.href='logout.php'">

@@ -909,13 +909,6 @@ usort($prescriptions, function($a, $b) {
                         <li><a href="backup.php"><i class="fas fa-database nav-icon"></i>Backup & Restore</a></li>
                     </ul>
                 </div>
-
-                <div class="nav-section">
-                    <div class="nav-title">ACCOUNT</div>
-                    <ul class="nav-links">
-                        <li><a href="profile.php"><i class="fas fa-user-cog nav-icon"></i>Profile Settings</a></li>
-                    </ul>
-                </div>
             </nav>
 
             <button class="logout-btn" onclick="window.location.href='logout.php'">
@@ -929,12 +922,6 @@ usort($prescriptions, function($a, $b) {
                 <div class="header-title">
                     <h1>Prescription Management</h1>
                     <p>Unified database tracking across all pharmacy systems</p>
-                </div>
-                <div class="header-actions">
-                    <div class="search-box">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" placeholder="Search Patient or ID..." id="searchInput" value="<?php echo htmlspecialchars($search); ?>">
-                    </div>
                 </div>
             </header>
 

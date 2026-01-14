@@ -789,16 +789,8 @@ $canDelete = ($_SESSION['role'] ?? '') === 'admin';
                     <div class="nav-title">ADMINISTRATION</div>
                     <ul class="nav-links">
                         <li><a href="user_management.php"><i class="fas fa-users nav-icon"></i>User Management</a></li>
-                        <li><a href="patient_management.php" class="active"><i class="fas fa-user-injured nav-icon"></i>Patient Management</a></li>
                         <li><a href="reports.php"><i class="fas fa-chart-bar nav-icon"></i>Reports</a></li>
                         <li><a href="backup.php"><i class="fas fa-database nav-icon"></i>Backup & Restore</a></li>
-                    </ul>
-                </div>
-
-                <div class="nav-section">
-                    <div class="nav-title">ACCOUNT</div>
-                    <ul class="nav-links">
-                        <li><a href="profile.php"><i class="fas fa-user-cog nav-icon"></i>Profile Settings</a></li>
                     </ul>
                 </div>
             </nav>

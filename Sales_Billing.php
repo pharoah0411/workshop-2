@@ -319,12 +319,6 @@ usort($prescriptions, function($a, $b) {
                     <h1>Sales & Billing</h1>
                     <p>Pharmacy Management - <?php echo date('l, F j, Y'); ?></p>
                 </div>
-                <div class="header-actions">
-                    <div class="search-box">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" placeholder="Search Patient Name..." onkeypress="if(event.key==='Enter') window.location.href='Sales_Billing.php?search='+this.value">
-                    </div>
-                </div>
             </header>
 
             <div class="content-wrapper">
