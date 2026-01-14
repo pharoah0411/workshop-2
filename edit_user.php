@@ -821,11 +821,10 @@ $username = $_SESSION['username'] ?? 'User';
                                         <i class="fas fa-user-tag"></i> Role <span class="required">*</span>
                                     </label>
                                     <select name="role" class="form-select" required>
-                                        <option value="">Select role</option>
-                                        <option value="admin" <?php echo ($user['role'] === 'admin') ? 'selected' : ''; ?>>Administrator</option>
-                                        <option value="pharmacist" <?php echo ($user['role'] === 'pharmacist') ? 'selected' : ''; ?>>Pharmacist</option>
-                                        <option value="staff" <?php echo ($user['role'] === 'staff') ? 'selected' : ''; ?>>Staff</option>
-                                    </select>
+    <option value="">Select role</option>
+    <option value="admin" <?php echo ($user['role'] === 'admin') ? 'selected' : ''; ?>>Administrator</option>
+    <option value="pharmacist" <?php echo ($user['role'] === 'pharmacist') ? 'selected' : ''; ?>>Pharmacist</option>
+</select>
                                 </div>
 
                                 <div class="form-group full-width">

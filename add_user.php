@@ -903,7 +903,7 @@ $username = $_SESSION['username'] ?? 'User';
                                         <option value="">Select role</option>
                                         <option value="admin">Administrator</option>
                                         <option value="pharmacist">Pharmacist</option>
-                                        <option value="staff">Staff</option>
+                                        
                                     </select>
                                 </div>
 
