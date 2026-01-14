@@ -26,16 +26,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             /* ===============================
-               1️⃣ SQL SERVER (PDO)
+               1️⃣ SQL SERVER (PDO) - FIXED: Use $pdo_sqlsrv instead of $pdo
             =============================== */
-            if (isset($pdo) && $pdo instanceof PDO) {
+            if (isset($pdo_sqlsrv) && $pdo_sqlsrv instanceof PDO) {
                 $db_online_count++;
-                $stmt = $pdo->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?");
+                $stmt = $pdo_sqlsrv->prepare("SELECT USER_ID, USERNAME, PASSWORD, ROLE FROM [USER] WHERE USERNAME = ?");
                 $stmt->execute([$username]);
                 $res = $stmt->fetch(PDO::FETCH_ASSOC);
                 if ($res) { 
                     $user = array_change_key_case($res, CASE_UPPER); 
-                    $activeConn = $pdo;
+                    $activeConn = $pdo_sqlsrv; // FIXED: Use $pdo_sqlsrv
                 }
             }
 
@@ -605,7 +605,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <i class="fas fa-user-injured"></i> I'm a Patient
         </button>
 
-        <!-- System Status -->
+        <!-- System Status - FIXED: Updated to use $pdo_sqlsrv -->
         <div class="system-status">
             <div class="status-title">
                 <i class="fas fa-server"></i> System Status
@@ -614,7 +614,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="status-item <?php echo (isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) ? 'status-online' : 'status-offline'; ?>">
                     MySQL
                 </div>
-                <div class="status-item <?php echo (isset($pdo) && $pdo instanceof PDO) ? 'status-online' : 'status-offline'; ?>">
+                <div class="status-item <?php echo (isset($pdo_sqlsrv) && $pdo_sqlsrv instanceof PDO) ? 'status-online' : 'status-offline'; ?>">
                     SQL Server
                 </div>
                 <div class="status-item <?php echo (isset($pg_conn) && $pg_conn instanceof PDO) ? 'status-online' : 'status-offline'; ?>">
