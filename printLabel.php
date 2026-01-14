@@ -634,7 +634,8 @@ $userRole = $_SESSION['role'] ?? 'Pharmacist';
             
             .sidebar,
             .main-header,
-            .print-control {
+            .print-control,
+            .database-status { /* UPDATED: Added to hide from print */
                 display: none !important;
             }
             
@@ -672,7 +673,6 @@ $userRole = $_SESSION['role'] ?? 'Pharmacist';
 </head>
 <body>
     <div class="dashboard-container">
-        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="pharmacy-logo">
                 <h1><i class="fas fa-pills"></i> PHARMACY SYSTEM</h1>
@@ -715,7 +715,6 @@ $userRole = $_SESSION['role'] ?? 'Pharmacist';
             </button>
         </aside>
 
-        <!-- Main Content -->
         <main class="main-content">
             <header class="main-header">
                 <div class="header-title">
@@ -730,7 +729,6 @@ $userRole = $_SESSION['role'] ?? 'Pharmacist';
             </header>
 
             <div class="content-wrapper">
-                <!-- Database Status -->
                 <div class="database-status">
                     <span class="status-item <?php echo (isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) ? 'status-online' : 'status-offline'; ?>">
                         <i class="fas fa-database"></i> MySQL: <?php echo (isset($mysql_conn2) && $mysql_conn2 instanceof mysqli) ? 'Connected' : 'Offline'; ?>
@@ -743,7 +741,6 @@ $userRole = $_SESSION['role'] ?? 'Pharmacist';
                     </span>
                 </div>
 
-                <!-- Print Control Bar -->
                 <div class="print-control">
                     <button onclick="window.print()" class="btn btn-print">
                         <i class="fas fa-print"></i> Print Labels
@@ -756,7 +753,6 @@ $userRole = $_SESSION['role'] ?? 'Pharmacist';
                     </a>
                 </div>
 
-                <!-- Labels Grid -->
                 <div class="labels-grid">
                     <?php if (empty($items)): ?>
                         <div class="empty-state">
