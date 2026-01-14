@@ -903,7 +903,6 @@ $username = $_SESSION['username'] ?? 'User';
                                         <option value="">Select role</option>
                                         <option value="admin">Administrator</option>
                                         <option value="pharmacist">Pharmacist</option>
-                                        <option value="staff">Staff</option>
                                     </select>
                                 </div>
 
@@ -928,7 +927,8 @@ $username = $_SESSION['username'] ?? 'User';
                                         <i class="fas fa-phone"></i> Phone Number <span class="required">*</span>
                                     </label>
                                     <input type="tel" name="phone" class="form-control" required 
-                                           placeholder="+1 (234) 567-8900">
+                                           placeholder="Enter 10-digit phone number" pattern="[0-9]{10}"
+                                           oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)">
                                 </div>
                             </div>
                         </div>
@@ -986,22 +986,6 @@ $username = $_SESSION['username'] ?? 'User';
     </div>
 
     <script>
-        // Auto-format phone number
-        const phoneInput = document.querySelector('input[name="phone"]');
-        phoneInput.addEventListener('input', function(e) {
-            let value = this.value.replace(/\D/g, '');
-            if (value.length > 0) {
-                value = '+1 (' + value;
-                if (value.length > 7) {
-                    value = value.substring(0, 7) + ') ' + value.substring(7);
-                }
-                if (value.length > 12) {
-                    value = value.substring(0, 12) + '-' + value.substring(12, 16);
-                }
-                this.value = value;
-            }
-        });
-
         // Confirm before submitting to All databases
         document.querySelector('form').addEventListener('submit', function(e) {
             const dbSelect = document.querySelector('select[name="source"]');
