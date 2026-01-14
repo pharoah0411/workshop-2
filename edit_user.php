@@ -821,10 +821,10 @@ $username = $_SESSION['username'] ?? 'User';
                                         <i class="fas fa-user-tag"></i> Role <span class="required">*</span>
                                     </label>
                                     <select name="role" class="form-select" required>
-    <option value="">Select role</option>
-    <option value="admin" <?php echo ($user['role'] === 'admin') ? 'selected' : ''; ?>>Administrator</option>
-    <option value="pharmacist" <?php echo ($user['role'] === 'pharmacist') ? 'selected' : ''; ?>>Pharmacist</option>
-</select>
+                                        <option value="">Select role</option>
+                                        <option value="admin" <?php echo ($user['role'] === 'admin') ? 'selected' : ''; ?>>Administrator</option>
+                                        <option value="pharmacist" <?php echo ($user['role'] === 'pharmacist') ? 'selected' : ''; ?>>Pharmacist</option>
+                                    </select>
                                 </div>
 
                                 <div class="form-group full-width">
@@ -851,7 +851,8 @@ $username = $_SESSION['username'] ?? 'User';
                                     </label>
                                     <input type="tel" name="phone" class="form-control"
                                            value="<?php echo htmlspecialchars($user['phone']); ?>"
-                                           placeholder="+1 (234) 567-8900">
+                                           placeholder="Enter 10-digit phone number" pattern="[0-9]{10}"
+                                           oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)">
                                 </div>
                             </div>
                         </div>
@@ -874,22 +875,6 @@ $username = $_SESSION['username'] ?? 'User';
     </div>
 
     <script>
-        // Auto-format phone number
-        const phoneInput = document.querySelector('input[name="phone"]');
-        phoneInput.addEventListener('input', function(e) {
-            let value = this.value.replace(/\D/g, '');
-            if (value.length > 0) {
-                value = '+1 (' + value;
-                if (value.length > 7) {
-                    value = value.substring(0, 7) + ') ' + value.substring(7);
-                }
-                if (value.length > 12) {
-                    value = value.substring(0, 12) + '-' + value.substring(12, 16);
-                }
-                this.value = value;
-            }
-        });
-
         // Confirm before submitting
         document.querySelector('form').addEventListener('submit', function(e) {
             if (!confirm('Are you sure you want to update this user in <?php echo htmlspecialchars($db); ?> database?')) {
