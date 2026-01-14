@@ -49,7 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ic_no'])) {
 
             if ($patient) {
                 $_SESSION['patient_id'] = $patient['PATIENT_ID'];
-                $_SESSION['patient_name'] = $patient['NAME'] ?: 'Valued Patient';
+                // MODIFIED: Removed the "Valued Patient" fallback to use the dynamic name from the database
+                $_SESSION['patient_name'] = $patient['NAME']; 
             } else {
                 $error = "No records found for IC: " . htmlspecialchars($ic_no);
             }
@@ -63,8 +64,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ic_no'])) {
 if (isset($_SESSION['patient_id'])) {
     $p_id = $_SESSION['patient_id'];
     $sql = "SELECT p.PRESCRIPTION_ID, p.DATE_ISSUED, p.STATUS, 
-                   pd.DOSAGE, pd.QUANTITY, pd.INSTRUCTION, 
-                   m.NAME as MED_NAME
+                    pd.DOSAGE, pd.QUANTITY, pd.INSTRUCTION, 
+                    m.NAME as MED_NAME
             FROM PRESCRIPTION p
             JOIN PRESCRIPTION_DETAIL pd ON p.PRESCRIPTION_ID = pd.PRESCRIPTION_ID
             JOIN MEDICINE m ON pd.MEDICINE_ID = m.MEDICINE_ID
@@ -636,7 +637,6 @@ if (isset($_SESSION['patient_id'])) {
 
     <div class="portal-content">
         <?php if (!isset($_SESSION['patient_id'])): ?>
-            <!-- Login Form -->
             <div class="login-container">
                 <div class="welcome-card">
                     <h2><i class="fas fa-lock"></i> Secure Patient Access</h2>
@@ -689,15 +689,10 @@ if (isset($_SESSION['patient_id'])) {
                     <a href="login.php">
                         <i class="fas fa-user-md"></i> Staff Login
                     </a>
-                    <span>|</span>
-                    <a href="index.php">
-                        <i class="fas fa-home"></i> Return to Home
-                    </a>
                 </div>
             </div>
 
         <?php else: ?>
-            <!-- Patient Dashboard -->
             <div class="patient-dashboard">
                 <div class="welcome-bar">
                     <div class="patient-info">

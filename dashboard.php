@@ -715,12 +715,6 @@ if ($postgresql_connected) $connected_dbs++;
                     <h1>Welcome, <?php echo htmlspecialchars($username); ?>!</h1>
                     <p>Pharmacy Management Dashboard - <?php echo date('l, F j, Y'); ?></p>
                 </div>
-                <div class="header-actions">
-                    <div class="search-box">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" placeholder="Search medicines, prescriptions...">
-                    </div>
-                </div>
             </header>
 
             <div class="content-wrapper">
